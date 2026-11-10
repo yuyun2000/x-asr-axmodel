@@ -1,0 +1,7 @@
+# Simulate Report
+
+Method: pulsar2 run
+
+- cosine_similarity: 0.9549355506896973
+- mae: 0.545974850654602
+- max_abs_diff: 8.654816627502441

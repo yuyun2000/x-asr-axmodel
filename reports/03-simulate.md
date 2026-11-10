@@ -34,7 +34,18 @@ ax   mean 0.1032 std 2.3963 min -6.373 max 6.186
 diff mean 0.0077 rms 0.7213      最佳缩放比 0.958
 ```
 
-## 第 2 次（改量化配置，进行中）
+## 第 2/3 次尝试（都没跑完）
+
+| 尝试 | 配置 | 结果 |
+|---|---|---|
+| v2 | 16 组满窗校准 + **Percentile** + **SmoothQuant** | 编译 79 分钟仍在 compiler 阶段，判定异常（v1 同样规模只需 30 分钟），终止 |
+| v3 | 16 组满窗校准 + **Percentile**（去掉 SmoothQuant） | 编译 63 分钟仍在 compiler 阶段，同样异常，终止 |
+
+结论：在这张 17.12 GMAC 的图上，**Percentile 校准方法 + SmoothQuant 会让 Pulsar2 的
+compiler 阶段耗时失控**（MinMax 是 30 分钟量级，Percentile 63 分钟未完成）。
+时间成本上不可接受，暂时回到 MinMax。
+
+## 待验证的改进方向（优先级从高到低）
 
 第 1 次的问题定位在两处：
 
@@ -44,11 +55,13 @@ diff mean 0.0077 rms 0.7213      最佳缩放比 0.958
 
 对应改动（`21_make_calib.py` + 新配置）：
 
-| 项 | 第 1 次 | 第 2 次 |
+| 方向 | 说明 | 成本 |
 |---|---|---|
-| 校准样本 | 7 组（多为补静音） | **16 组**，滑窗取满 10 s 语音（speech ratio 0.62–1.00） |
-| calibration_method | MinMax | **Percentile** |
-| enable_smooth_quant | false | **true**（threshold 0.5 / strength 0.5） |
-| highest_mix_precision | false | false（保持纯 INT8，遵守工作区量化口径） |
+| ① 只换校准集（MinMax + 16 组满窗） | 最接近 v1，编译时间可控；静音帧污染是 v1 的已知缺陷 | 编译 ~40 min |
+| ② 混精（`highest_mix_precision: true` 或对敏感层用 `layer_configs.data_type=FP32`） | Pulsar2 的标准精度补救；但违反「默认 INT8、highest_mix_precision=false」的口径，**需要你点头** | 编译 ~40 min，模型变大、变慢 |
+| ③ 更多真实业务音频做校准（32 组以上） | 语音分布更贴近线上（方言、噪声、远场） | 需要素材 |
+| ④ QAT / AdaRound / LSQ | Pulsar2 支持 `enable_adaround` / `enable_lsq`，代价是编译时间与调参 | 小时级 |
+| ⑤ 换更小的子模型 | 例如只转前 3 个 encoder stack 验证通路（精度不可用，仅验证编译链路） | 30 min |
 
-待第 2 次编译完成后回填本表。
+第 1 次的结论已经能确定一件事：**「能编译、能跑仿真」是通的，「INT8 精度达标」还没通**。
+下一步建议先走 ①（低成本验证校准集的影响），不行再讨论 ②。

@@ -19,3 +19,5 @@ todos/
 
 # 小文件保留
 !assets/**
+__pycache__/
+*.pyc

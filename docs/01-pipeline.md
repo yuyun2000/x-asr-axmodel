@@ -13,6 +13,9 @@ task/export/model.onnx      x4d[1,1,1000,80] → Reshape → x[1,1000,80] → �
    │  25_fold_if.py        （把 43 个条件恒定的 If 展开成直线代码，Pulsar2 不支持 If）
    ▼
 task/export/model_folded.onnx
+   │  26_freeze_shapes.py  （把 2477 个 shape 计算链冻结成常量，Pulsar2 要求 Reshape 形状静态）
+   ▼
+task/export/model_static.onnx
    │  40_build.py          （Magnetar COMPILE → SIMULATE）
    ▼
 task/compile/model.axmodel + task/simulate/simulate_report.md（cosine / MAE）
@@ -88,6 +91,27 @@ Pulsar2 的量化执行器不支持 `If`，会报 `Op Execution Error: .../If`�
 > Pulsar2 自带的 `enable_onnxsim` 同理。
 
 然后把 `task/export/model.onnx` 换成 folded 版本（原图留 `model.orig.onnx` 备查）。
+
+## 2.6 冻结 shape 计算链
+
+```bash
+$MAGNETAR_BASE_VENV/bin/python 26_freeze_shapes.py \
+  --src task/export/model_folded.onnx --dst task/export/model_static.onnx --input x4d:1,1,1000,80
+```
+
+Zipformer 的 `NonlinAttention` 等处有 `x.reshape(x.shape[0], -1, d)`，导出后 Reshape 的
+shape 输入是一条 Shape→Gather→Concat 链。Pulsar2 的 shape function 只接受静态常量，
+否则报：
+
+```
+op name: /encoder/3/encoder/1/nonlin_attention/Reshape_1, Reshape, shapefn failed.
+input: {'x': Tensor(FP32, shape=(62,1,576), ...), 'shape': Tensor(S64, name=.../Concat_1_output_0, ...)}
+```
+
+输入 shape 固定时这些值都是常量：脚本把它们用 onnxruntime 求值后写成 initializer，
+再剪掉不再被引用的节点。
+
+结果：冻结 **2477** 个形状张量，节点 10775 → **4819**，`cosine = 1.00000000`，`max|diff| = 0`。
 
 ## 3. 编译 + 仿真
 

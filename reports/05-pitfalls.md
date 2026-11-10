@@ -85,3 +85,31 @@ input: {'x': Tensor(FP32, shape=(62, 1, 576)), 'shape': Tensor(S64, name=.../Con
 
 Zipformer2 的 subsample 是 **4 倍**：输入 1000 帧 → `encoder_out[1, 248, 512]`。
 一开始按 1/2 估算（500）是错的，以实际导出为准。
+
+## 10. **`Log` 节点会让图被切成 33 个 NPU/CPU 子图**（关键，参考 AX 官方教程后解决）
+
+```
+subgraph [25], type: GraphType.ONNX, /encoder/4/encoder/3/conv_module2/out_proj/Log(AxLog)
+subgraph [26], type: GraphType.NPU
+```
+
+- 根因：icefall 的 Zipformer 用 `SwooshL/SwooshR` 激活，导出后是
+  `Log(1 + Exp(-|x|))` 的数值稳定写法。**Pulsar2 不支持 `Log`**，于是每个 Log 单独被切成
+  ONNX(CPU) 子图 —— 实测 17 个 NPU 子图与 16 个 CPU 子图相互穿插，
+  编译时间爆炸（>60 min 不结束），端侧还要在 CPU/NPU 之间来回拷贝。
+- AXERA 官方 [zipformer.axera](https://github.com/AXERA-TECH/zipformer.axera) 的
+  `cut_reciprocal_encoder.py` 就是同一类做法（把 NPU 不支持的 `Reciprocal` 换成 `Div`）。
+- 处理：`27_fold_swoosh.py` 把 `Log(1 + Exp(z))` 改写成 `Softplus(z)`
+  （先验证 Pulsar2 支持 `Softplus`：`x → Softplus → y` 最小图能编译通过）。
+  99 处改写后：**1 个 NPU 子图、0 个 CPU 子图**，数值 `cosine = 1.00000000`（max diff 3.5e-5）。
+
+## 11. 单子图的大模型会让 Pulsar2 的 cmodel 仿真崩溃
+
+```
+AX650CModelError: assert(wdma[0].size == 0) error in .../cmodel/sys/sys_cv.cpp run() at line 60
+```
+
+- 现象：合并成单个 NPU 子图后（`max_cycle = 97,949,776`），`pulsar2 run` 仿真在
+  `subgraph_npu_0` 上崩；而拆成 33 个子图（v1）时同一份 ONNX 能正常仿真（cosine 0.955）。
+- 判断：cmodel（软件仿真器）对超长单子图有 bug/限制，不是模型本身的问题。
+- 对策见 `reports/03-simulate.md` 的处理记录。

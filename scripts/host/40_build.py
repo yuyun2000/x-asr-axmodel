@@ -26,6 +26,10 @@ def main() -> None:
     ap.add_argument("--export-src", default=None,
                     help="外部 export 目录（含 model.onnx / model_meta.json / calib_data）")
     ap.add_argument("--skip-compile", action="store_true")
+    ap.add_argument("--skip-toolchain", action="store_true",
+                    help="跳过 Magnetar TOOLCHAIN（arm.com 交叉编译器常被限速卡住；"
+                         "编译/仿真只需要 Pulsar2 独立包）")
+    ap.add_argument("--backend", default=None, help="显式指定 Pulsar2 后端，如 pkg:/path/8.0")
     args = ap.parse_args()
 
     from magnetar.stages.init import run as init_run
@@ -55,8 +59,23 @@ def main() -> None:
                 shutil.copy2(p, dst / p.name)
         print(f"[export] 从 {src} 同步到 {dst}")
 
-    backend = toolchain_run(None, task_dir)
-    print(f"[toolchain] backend={backend}")
+    if args.skip_toolchain:
+        from magnetar.pulsar2_util import resolve_backend
+        backend = args.backend or resolve_backend()
+        cfg_path = task_dir / "config.json"
+        cfg = json.loads(cfg_path.read_text(encoding="utf-8")) if cfg_path.is_file() else {}
+        bsp_out = Path.home() / ".cache" / "magnetar" / "bsp" / "ax650" / "msp" / "out"
+        cfg.update({
+            "PULSAR2_BACKEND": backend,
+            "BSP_ROOT": str(bsp_out.parent.parent) if bsp_out.exists() else "",
+            "AX_RUNTIME_ROOT": str(bsp_out) if bsp_out.exists() else "",
+            "CXX_TOOLCHAIN": "",
+        })
+        cfg_path.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
+        print(f"[toolchain] skipped, backend={backend}")
+    else:
+        backend = toolchain_run(None, task_dir)
+        print(f"[toolchain] backend={backend}")
 
     if not args.skip_compile:
         compile_run(task_dir, args.target, backend)

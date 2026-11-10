@@ -10,7 +10,10 @@ onnx/encoder.fp32.onnx      x[1,1000,80] → encoder_out[1,500,512]   （静态�
    │  20_prep_task.py      （4D 包装 + 真实 fbank 校准集 + model_meta.json）
    ▼
 task/export/model.onnx      x4d[1,1,1000,80] → Reshape → x[1,1000,80] → …
-   │  40_build.py          （Magnetar TOOLCHAIN → COMPILE → SIMULATE）
+   │  25_fold_if.py        （把 43 个条件恒定的 If 展开成直线代码，Pulsar2 不支持 If）
+   ▼
+task/export/model_folded.onnx
+   │  40_build.py          （Magnetar COMPILE → SIMULATE）
    ▼
 task/compile/model.axmodel + task/simulate/simulate_report.md（cosine / MAE）
 ```
@@ -67,12 +70,31 @@ $MAGNETAR_BASE_VENV/bin/python 20_prep_task.py \
 为什么包成 4 维：Pulsar2 的 `Layout` 枚举只有 `NHWC / NCHW`，3 维输入没有对应的
 布局语义；包一层 `[1,1,T,80]` 再在图内 Reshape 回去，代价可以忽略。
 
+## 2.5 展开 If（Pulsar2 必需）
+
+```bash
+$MAGNETAR_BASE_VENV/bin/python 25_fold_if.py \
+  --src task/export/model.onnx --dst task/export/model_folded.onnx --input x4d:1,1,1000,80
+```
+
+icefall 导出的图里有 43 个 `If` 节点（Zipformer 的 `ConvModule` / `downsample` 按输入长度
+分支，被 TorchScript 保留成控制流）。条件只依赖静态 shape，在 T=1000 下是常量。
+Pulsar2 的量化执行器不支持 `If`，会报 `Op Execution Error: .../If`。
+
+本脚本把 condition 加进图输出让 onnxruntime 求值，再把选中的分支内联进主图。
+验证结果：`cosine(orig, folded) = 1.00000000`，`max|diff| = 0.000000`，节点 10405 → 10775。
+
+> 试过 `onnxsim`（0.7.3），在 598 MB / 10405 节点的图上跑 10 分钟以上未收敛，已放弃；
+> Pulsar2 自带的 `enable_onnxsim` 同理。
+
+然后把 `task/export/model.onnx` 换成 folded 版本（原图留 `model.orig.onnx` 备查）。
+
 ## 3. 编译 + 仿真
 
 ```bash
 source ~/AX-model/env.sh
 PYTHONPATH=$HOME/AX-model/Magnetar:$PYTHONPATH \
-  $MAGNETAR_BASE_VENV/bin/python 40_build.py --task-dir task --target AX650
+  $MAGNETAR_BASE_VENV/bin/python 40_build.py --task-dir task --target AX650 --skip-toolchain
 ```
 
 产物：
@@ -81,5 +103,8 @@ PYTHONPATH=$HOME/AX-model/Magnetar:$PYTHONPATH \
 - `task/compile/pulsar2_config.json`（可复现的编译配置）
 - `task/simulate/simulate_report.md`（cosine / MAE / max_abs_diff）
 - `task/simulate/pulsar2_run.log`
+
+> `--skip-toolchain`：Magnetar 的 TOOLCHAIN 阶段会去 arm.com 下载 aarch64 交叉编译器，
+> 该站点限速会卡住（AGENTS.md 已记录）；编译/仿真并不需要它，所以跳过。
 
 验收线：`cosine_similarity ≥ 0.99`（Magnetar 的 accuracy gate）。

@@ -1,5 +1,32 @@
 # 上游化路径（先跑通再 PR）
 
+## 已完成（2026-11-10）
+
+| 项 | 状态 |
+|---|---|
+| 精度验收 | ✅ Pulsar2 仿真 mean cosine **0.9981**（min 0.9967），ONNX↔AXMODEL 文本逐 token 一致（0.wav） |
+| 模型发布 | ✅ <https://huggingface.co/yunyu1258/x-asr-axmodel>（encoder.axmodel + decoder/joiner.onnx + tokens + run_asr.py） |
+| 转换仓库 | ✅ <https://github.com/yuyun2000/x-asr-axmodel> |
+| sherpa-onnx PR | ✅ <https://github.com/k2-fsa/sherpa-onnx/pull/4185>（转换流水线，2 commit / +679 行） |
+| 运行时（C++） | ⬜ 未做：本机没有 aarch64 交叉编译器与 AX 开发板，无法编译/测试 |
+
+PR 内容与官方 zipformer 教程对齐：`scripts/zipformer-transducer/x-asr/axera/` 下放
+`prepare-encoder.py`（If 展开 / 形状冻结 / Swoosh→Softplus）、`make-calibration-set.py`、
+`pulsar2-encoder.json`、`verify-with-simulator.py` 与 README。
+
+## 下一步（需要资源）
+
+1. **板端验证**：拿到 AX650/AXCL 后跑 `pulsar2 run` + 实机推理，补齐延迟/内存数字；
+2. **运行时 PR**：给 sherpa-onnx 加 `provider=axera` 的离线 transducer 支持
+   （模板化 `OfflineRecognizerTransducerImpl` + `OfflineTransducerModelAxera`），
+   需要交叉编译环境；可参考 PR #3271 的流式实现；
+3. **精度再提升**：U16 混合量化（Pulsar2 cmodel 在 U16 上会崩，需真板）、
+   用真实业务音频做校准；
+4. **跟进 PR #4185 review**。
+
+---
+
+
 前提：本仓库的 axmodel 跑通且仿真 cosine ≥ 0.99，并且至少有一个真实音频的「字级一致」证据。
 在拿到这些之前不提 PR——上游对「只产出二进制模型」的改动接受度低，需要的是可复现的代码路径。
 

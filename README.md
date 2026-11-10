@@ -3,8 +3,12 @@
 把 [X-ASR-zh-en](https://huggingface.co/GilgameshWind/X-ASR-zh-en)（0.16B，Zipformer2 transducer，
 中英双语，Apache-2.0）的离线 encoder 转换成 AXERA AX650 的 axmodel，并给出板端推理与复现流程。
 
-转换参考了 AXERA 官方的 [zipformer.axera](https://github.com/AXERA-TECH/zipformer.axera) 工程
-（U16 混合量化 + SmoothQuant + `conv_bias FP32` 那一套）。
+转换时对照了 AXERA 官方的 [zipformer.axera](https://github.com/AXERA-TECH/zipformer.axera) 工程：
+官方用 `cut_reciprocal_encoder.py` 把 NPU 不支持的 `Reciprocal` 换成 `Div`；我们这边对应的是
+把 `Log(1+Exp(-abs(x)))`（SwooshL/SwooshR 激活）换成 `Softplus` —— 这一步把图从
+33 个子图收敛到 1 个 NPU 子图，是精度和编译时间都变好的关键。
+官方默认的 U16 混合量化与 SmoothQuant 也试过，但 Pulsar2 的 cmodel 仿真在 U16 上会崩、
+SmoothQuant 编译被 SIGTERM，最终交付纯 INT8（质量与 sherpa-onnx 官方 int8 模型同量级）。
 
 ## 已发布的产物
 
@@ -31,11 +35,27 @@ python deploy/python/run_asr.py --models-dir models --audio models/test_wavs/0.w
 | 1. fp32 静态 ONNX 导出 | ✅ | `onnx/encoder.fp32.onnx`（571 MB），导出文本与 sherpa int8 逐字一致 |
 | 2. If 展开（43→0） | ✅ | `scripts/host/25_fold_if.py`，cosine 1.0 / max diff 0 |
 | 3. shape 计算链冻结（2477 个） | ✅ | `scripts/host/26_freeze_shapes.py`，节点 10775→4819 |
+| 3.5 Log→Softplus（99 处） | ✅ | `scripts/host/27_fold_swoosh.py`，33 子图 → **1 个 NPU 子图**，cosine 1.0 |
 | 4. Pulsar2 编译 | ✅ | `model.axmodel` 165 MB，**17.12 GMAC / 10 s**，单 NPU 子图 |
 | 5. 精度验收（cosine ≥ 0.99） | ✅ | **cosine 0.999012**，端到端文本与 ONNX 逐 token 一致，见 `reports/03-simulate.md` |
 | 6. 板端推理 + 部署文档 | 🚧 | `deploy/`（脚本已就绪，待板端实测） |
 | 7. HF 模型发布 | ✅ | <https://huggingface.co/yunyu1258/x-asr-axmodel> |
 | 8. 上游 sherpa-onnx PR | ✅ | <https://github.com/k2-fsa/sherpa-onnx/pull/4185> |
+
+## 精度结果
+
+Pulsar2 仿真（AX650），同一批音频、同一套 fbank：
+
+| wav | cosine（ONNX vs AXMODEL） | 文本（相对 fp32 ONNX 的 token 编辑距离） | 对照：sherpa-onnx 官方 int8 |
+|---|---|---|---|
+| 0 | 0.999012 | 0 | 0 |
+| 1 | 0.998276 | 10（`ALWAYS ALWAYS`→`OS OS`） | 0 |
+| 2 | 0.996739 | 2 | 3 |
+| 3 | 0.998375 | 2 | 5 |
+| 合计 | min 0.9967 | 14 | 8 |
+
+**结论**：cosine 全部 ≥0.99；文本质量与 sherpa-onnx 官方 int8 模型同量级
+（2 条更准、1 条持平、1 条英文重复词更差）。详见 `reports/03-simulate.md`。
 
 ## 为什么是「离线 10 秒窗口」
 
@@ -50,8 +70,9 @@ python deploy/python/run_asr.py --models-dir models --audio models/test_wavs/0.w
 ## 目录
 
 ```
-scripts/host/     转换流水线（00_setup → 10_export → 20/21 校准 → 25_fold → 26_freeze
-                  → 40_build → 50_text_consistency → 60_upload_hf）
+scripts/host/     转换流水线（00_setup → 10_export → 20/21 校准 → 25_fold_if → 26_freeze_shapes
+                  → 27_fold_swoosh → 40_build → 50/51/52 验证 → 60_upload_hf）
+configs/          已发布模型对应的 Pulsar2 配置（pulsar2-released.json）
 scripts/host/k2stub/   k2 wheel 与 torch 2.x 不兼容，用 stub 顶掉
 scripts/local/    本机验证（fbank 数值等价）
 deploy/           板端部署（Python 推理 + 说明）

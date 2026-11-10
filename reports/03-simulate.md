@@ -40,6 +40,7 @@ diff mean 0.0077 rms 0.7213      最佳缩放比 0.958
 |---|---|---|
 | v2 | 16 组满窗校准 + **Percentile** + **SmoothQuant** | 编译 79 分钟仍在 compiler 阶段，判定异常（v1 同样规模只需 30 分钟），终止 |
 | v3 | 16 组满窗校准 + **Percentile**（去掉 SmoothQuant） | 编译 63 分钟仍在 compiler 阶段，同样异常，终止 |
+| v4 | 16 组满窗校准 + **MinMax**（与 v1 同方法，只换校准集） | 编译 **78 分钟**仍在 compiler 阶段（v1 只用 38 分钟），终止 |
 
 结论：在这张 17.12 GMAC 的图上，**Percentile 校准方法 + SmoothQuant 会让 Pulsar2 的
 compiler 阶段耗时失控**（MinMax 是 30 分钟量级，Percentile 63 分钟未完成）。

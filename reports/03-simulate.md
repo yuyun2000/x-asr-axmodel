@@ -150,4 +150,5 @@ Pulsar2 不支持 `Log`，之前它把图切成 17 个 NPU + 16 个 CPU 子图�
 | 校准集 7 → 16 组（含粤语长句） | cosine 互有高低，文本差异同量级，无收益 |
 | 校准集加入 88 s 英文长音频（noise1-en）+ 英文 rap | 1.wav 仍然 `OS OS`，cosine 略降（0.9984） |
 | SmoothQuant（官方默认开启） | Pulsar2 在 "Analysing Smooth Quantization Error" 之后被 SIGTERM（疑似内存峰值），未完成 |
-| U16 混合量化（官方 zipformer 配置） | 能编译，但 Pulsar2 的 cmodel 仿真在 U16 上直接崩（`AX650CModelError`），无法验证 → 不采用 |
+| U16 混合量化（官方 zipformer 配置） | 能编译，但 Pulsar2 的 cmodel 仿真在 U16 上直接崩（`AX650CModelError: assert(wdma[0].size == 0)`），无法验证 → 不采用 |
+| `highest_mix_precision: true`（Pulsar2 自动选层混精） | 编译失败：`TileFailException("AxPow only supports power with 0.25, 0.5, 2 and 4, however got [-0.5]") @ /encoder_embed/out_norm/Pow_1` —— 混精后 `rsqrt` 变体落到了 NPU 上；要修得再做一次图改写（Pow(-0.5) → Sqrt+Div），暂不做 |

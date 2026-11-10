@@ -120,12 +120,27 @@ class Recognizer:
     CTX = 2
 
     def __init__(self, models_dir: Path):
-        from axengine import InferenceSession
-
         self.dir = models_dir
-        self.enc = InferenceSession(str(models_dir / "encoder.axmodel"))
+        axmodel = models_dir / "encoder.axmodel"
+        onnx_model = models_dir / "encoder.onnx"
+        if axmodel.exists():
+            from axengine import InferenceSession
+            self.enc = InferenceSession(str(axmodel))
+            self.enc_backend = "axmodel"
+        elif onnx_model.exists():
+            # 没有板子时（x86/macOS 上）用 fp32 ONNX 验证同一套推理逻辑
+            import onnxruntime as ort
+            self.enc = ort.InferenceSession(str(onnx_model), providers=["CPUExecutionProvider"])
+            self.enc_backend = "onnx"
+        else:
+            raise SystemExit(f"{models_dir} 下既没有 encoder.axmodel 也没有 encoder.onnx")
         self.enc_in = self.enc.get_inputs()[0].name
         self.enc_out = self.enc.get_outputs()[0].name
+        # axmodel 的输入是 [1,1,T,80]（4 维包装），原始 fp32 ONNX 是 [1,T,80]
+        try:
+            self.enc_rank = len(self.enc.get_inputs()[0].shape)
+        except Exception:
+            self.enc_rank = 4
 
         # decoder / joiner：NPU 版优先，否则回退到 CPU 的 onnxruntime
         dec_ax = models_dir / "decoder.axmodel"
@@ -156,8 +171,12 @@ class Recognizer:
         if feats.shape[0] < frames:
             pad = np.full((frames - feats.shape[0], 80), np.log(1.1920929e-07), dtype=np.float32)
             feats = np.concatenate([feats, pad])
-        x = feats[:frames][None, None, ...].astype(np.float32)
-        out = self.enc.run([self.enc_out], {self.enc_in: x})[0]
+        x = feats[:frames][None, None, ...].astype(np.float32) if self.enc_rank == 4 \
+            else feats[:frames][None, ...].astype(np.float32)
+        if self.enc_backend == "axmodel":
+            out = self.enc.run([self.enc_out], {self.enc_in: x})[0]
+        else:
+            out = self.enc.run(None, {self.enc_in: x})[0]
         return np.asarray(out).reshape(-1, out.shape[-1])
 
     def greedy(self, enc: np.ndarray) -> str:
@@ -179,14 +198,17 @@ class Recognizer:
         text = "".join(self.tokens[i] for i in hyp)
         return text.replace("▁", " ").strip()
 
-    def transcribe(self, samples: np.ndarray, hop_frames: int = 800) -> str:
+    def transcribe(self, samples: np.ndarray, hop_frames: int = 800,
+                   min_tail_frames: int = 500) -> str:
+        """按 10 s 窗口切分；尾部不足 min_tail_frames（5 s）的残段并入上一窗，避免重复出字。"""
         feats = fbank80(samples)
         parts = []
         start = 0
         while start < feats.shape[0]:
-            win = feats[start:start + self.FRAMES]
-            if win.shape[0] == 0:
+            remaining = feats.shape[0] - start
+            if remaining < min_tail_frames and parts:
                 break
+            win = feats[start:start + self.FRAMES]
             parts.append(self.greedy(self.encode(win)))
             if win.shape[0] < self.FRAMES:
                 break
@@ -202,7 +224,7 @@ def main() -> None:
     args = ap.parse_args()
 
     rec = Recognizer(Path(args.models_dir))
-    print(f"[x-asr-axmodel] decoder backend: {rec.backend}")
+    print(f"[x-asr-axmodel] encoder backend: {rec.enc_backend}; decoder backend: {rec.backend}")
 
     files = []
     if args.audio:

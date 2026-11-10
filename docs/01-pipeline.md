@@ -16,6 +16,9 @@ task/export/model_folded.onnx
    │  26_freeze_shapes.py  （把 2477 个 shape 计算链冻结成常量，Pulsar2 要求 Reshape 形状静态）
    ▼
 task/export/model_static.onnx
+   │  27_fold_swoosh.py    （Log(1+Exp(z)) → Softplus(z)，否则 Pulsar2 把图切成 33 个子图）
+   ▼
+task/export/model_softplus.onnx     ← 最终用于编译的图（单 NPU 子图）
    │  40_build.py          （Magnetar COMPILE → SIMULATE）
    ▼
 task/compile/model.axmodel + task/simulate/simulate_report.md（cosine / MAE）
@@ -132,3 +135,21 @@ PYTHONPATH=$HOME/AX-model/Magnetar:$PYTHONPATH \
 > 该站点限速会卡住（AGENTS.md 已记录）；编译/仿真并不需要它，所以跳过。
 
 验收线：`cosine_similarity ≥ 0.99`（Magnetar 的 accuracy gate）。
+
+
+## 4. 精度验证
+
+```bash
+# 单样本：ONNX 参考输出 vs axmodel 仿真输出（cosine + 字级一致性）
+$MAGNETAR_BASE_VENV/bin/python 50_text_consistency.py \
+  --task-dir task --onnx-dir onnx --tokens tokens/tokens_nopunct.txt
+
+# 多样本：逐条跑仿真，报 cosine / MAE / 文本是否一致
+PYTHONPATH=$HOME/AX-model/Magnetar:$PYTHONPATH $MAGNETAR_BASE_VENV/bin/python 51_simulate_multi.py \
+  --task-dir task --wav-dir wavs --onnx-dir onnx --tokens tokens/tokens_nopunct.txt \
+  --out reports/multi_sim.json --limit 4
+```
+
+> 注意：`pulsar2 run` 会把输出目录里**已存在**的 `encoder_out.bin` 当成参考做 bit-true 比较，
+> 反复仿真同一目录会报 `output differs from ... (bit true)`。`51_simulate_multi.py` 给每条
+> 样本用独立目录规避了这个问题。

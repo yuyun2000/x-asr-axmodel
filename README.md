@@ -24,9 +24,9 @@ python deploy/python/run_asr.py --models-dir models --audio models/test_wavs/0.w
 | 1. fp32 静态 ONNX 导出 | ✅ | `onnx/encoder.fp32.onnx`（571 MB），导出文本与 sherpa int8 逐字一致 |
 | 2. If 展开（43→0） | ✅ | `scripts/host/25_fold_if.py`，cosine 1.0 / max diff 0 |
 | 3. shape 计算链冻结（2477 个） | ✅ | `scripts/host/26_freeze_shapes.py`，节点 10775→4819 |
-| 4. Pulsar2 编译 | ✅ | `model.axmodel` 172.6 MB，**17.12 GMAC / 10 s** |
-| 5. 精度验收（cosine ≥ 0.99） | 🚧 | 见 `reports/03-simulate.md` |
-| 6. 板端推理 + 部署文档 | 🚧 | `deploy/` |
+| 4. Pulsar2 编译 | ✅ | `model.axmodel` 165 MB，**17.12 GMAC / 10 s**，单 NPU 子图 |
+| 5. 精度验收（cosine ≥ 0.99） | ✅ | **cosine 0.999012**，端到端文本与 ONNX 逐 token 一致，见 `reports/03-simulate.md` |
+| 6. 板端推理 + 部署文档 | 🚧 | `deploy/`（脚本已就绪，待板端实测） |
 | 7. HF 模型发布 | ⬜ | `scripts/host/60_upload_hf.py`（带精度门禁） |
 | 8. 上游 sherpa-onnx PR | ⬜ | `docs/03-upstream-plan.md` |
 

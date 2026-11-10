@@ -1,0 +1,42 @@
+{
+  "_comment": [
+    "生成已发布 axmodel（huggingface.co/yunyu1258/x-asr-axmodel）的 Pulsar2 配置。",
+    "输入 ONNX 由 scripts/host 的 20_prep_task.py → 25_fold_if.py → 26_freeze_shapes.py → 27_fold_swoosh.py 生成。",
+    "校准集：21_make_calib.py --wav-dir wavs --num 16（16 条真实音频滑窗），calibration_size 取前 8 组。",
+    "compiler.check 必须为 0，否则 Pulsar2 在 confused op refine 阶段会卡很久。"
+  ],
+  "model_type": "ONNX",
+  "npu_mode": "NPU1",
+  "target_hardware": "AX650",
+  "input_shapes": "x4d:1x1x1000x80",
+  "onnx_opt": {
+    "disable_onnx_optimization": false,
+    "enable_onnxsim": false,
+    "model_check": true
+  },
+  "quant": {
+    "input_configs": [
+      {
+        "tensor_name": "x4d",
+        "calibration_format": "Numpy",
+        "calibration_size": 8,
+        "calibration_mean": [],
+        "calibration_std": []
+      }
+    ],
+    "calibration_method": "MinMax",
+    "precision_analysis": false,
+    "highest_mix_precision": false
+  },
+  "input_processors": [
+    {
+      "tensor_name": "x4d",
+      "tensor_layout": "NCHW",
+      "src_dtype": "FP32",
+      "src_layout": "NCHW"
+    }
+  ],
+  "compiler": {
+    "check": 0
+  }
+}

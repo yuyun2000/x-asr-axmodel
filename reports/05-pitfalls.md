@@ -126,3 +126,25 @@ TileFailException("AxPow, AxPow only supports power with 0.25, 0.5, 2 and 4,
   融合进 `LayerNormalization`，混精打断融合后 `AxPow` 就遇到不支持的指数；
 - 处理：`28_fold_pow.py` 改写成 `1 / Sqrt(x)`（与 AX 官方 `Reciprocal → Div` 同理），
   20 处替换后 `cosine = 1.00000000`（max diff 3.1e-5）。
+
+## 13. 混精 + Softplus 的 LUT 限制（最终放弃混精）
+
+```
+TileFailException: AxSoftplus, 'dont support lut_float opr in AXOPS/ONNXOPS/CUSTOM_OPS'
+op: /encoder/0/layers.0/feed_forward1/out_proj/Log
+```
+
+- 把 `Pow(-0.5)` 改写掉之后，混精路径继续推进，但卡在了第 10 条里的 `Softplus`：
+  量化路径下 `AxSoftplus` 用**定点 LUT** 实现，而混精会让该层变成 FP32，FP32 的 LUT
+  （`lut_float`）不被支持；
+- 也就是说 **`Log→Softplus` 改写与混合精度互斥**：要混精就得保留 `Log`，而 `Log` 会把图
+  切成 33 个子图（编译超时 + 精度崩），死循环；
+- 结论：**放弃混精，交付纯 INT8 + Softplus** 这一条唯一验证通过的路径。
+
+### 三条精度改进路线全部关闭（合起来看）
+
+| 路线 | 阻塞点 |
+|---|---|
+| U16 逐层量化（AX 官方默认） | Pulsar2 cmodel 仿真崩溃，无法验证 |
+| `highest_mix_precision` | `AxSoftplus` 不支持 FP32 LUT |
+| SmoothQuant | 编译被 SIGTERM（内存峰值） |

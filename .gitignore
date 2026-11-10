@@ -1,0 +1,21 @@
+# 权重与中间产物都不进 git
+weight/
+onnx/
+exp/
+axmodel/
+task/
+calib/
+reports/simulate/
+*.onnx
+*.pt
+*.tar.bz2
+*.tar.gz
+*.npy
+*.axmodel
+
+# 任务目录里由 Magnetar 生成的东西
+todos/
+.magnetar-*
+
+# 小文件保留
+!assets/**

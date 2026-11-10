@@ -10,9 +10,9 @@
 | 阶段 | 状态 | 产物 | 备注 |
 |---|---|---|---|
 | 0. 模型来源确认 | ✅ | — | 官方 checkpoint + icefall 导出脚本 |
-| 1. fp32 离线 ONNX 导出 | 🚧 | `onnx/encoder.fp32.onnx` | 官方 CI 同款脚本，关掉 int8 |
-| 2. 静态 shape（NPU 友好） | ⬜ | `onnx/encoder.static.onnx` | `--max-len 1000` / `--keep-x-lens 0` |
-| 3. Pulsar2 编译 | ⬜ | `axmodel/encoder.axmodel` | AX650 INT8 |
+| 1. fp32 离线 ONNX 导出 | ✅ 2026-11-10 | `onnx/encoder.fp32.onnx`（571 MB） | 官方 CI 同款脚本，关掉 int8；导出文本与 sherpa int8 完全一致 |
+| 2. 静态 shape（NPU 友好） | ✅ 2026-11-10 | `task/export/model.onnx` | `--max-len 1000` / `--keep-x-lens 0` + 4D 包装，输出 `[1,248,512]` |
+| 3. Pulsar2 编译 | 🚧 | `task/compile/model.axmodel` | AX650 INT8，7 组真实 fbank 校准 |
 | 4. 仿真精度验证 | ⬜ | `reports/simulate.md` | cosine ≥ 0.99 |
 | 5. 端到端出字验证 | ⬜ | `reports/e2e.md` | 需要 AXCL/开发板 |
 | 6. 上游 PR | ⬜ | — | 见 `docs/03-upstream-plan.md` |

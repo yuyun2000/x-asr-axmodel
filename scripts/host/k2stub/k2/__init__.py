@@ -12,6 +12,7 @@ ImportError。本仓库的导出流程不需要 FSA 训练/解码，因此用这
 """
 
 __version__ = "0.0.0-k2stub"
+with_cuda = False
 
 from . import version  # noqa: F401,E402
 

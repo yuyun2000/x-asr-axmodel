@@ -56,6 +56,19 @@ assets/          tokens.txt、测试音频等小文件
   - base venv Python 3.10 + torch 2.14.1+cpu + onnx 1.22 + ort 1.23.2
 - 目标芯片：AX650（Pulsar2 仿真验证；板端验证需要 AXCL 或开发板）
 
+## 结论（2026-11-10 首次尝试）
+
+| 项 | 状态 |
+|---|---|
+| fp32 静态 ONNX 导出 | ✅ 与 sherpa-onnx 的 int8 模型逐字一致 |
+| If 展开 + 形状冻结 | ✅ 数值等价（cosine 1.0 / max diff 0） |
+| Pulsar2 编译 AX650 INT8 | ✅ 172.6 MB，17.12 GMAC/10 s |
+| 仿真 cosine | ⚠️ **0.955**（验收线 0.99），且贪心解码为空 |
+| 结论 | 「能编译、能跑仿真」已通；**「INT8 精度达标」未通** |
+
+下一步优先做「关掉 `precision_analysis` 把编译时间压到 10–15 分钟」，再系统试校准集 /
+量化方法；混精（highest_mix_precision）需要先确认是否允许。详见 `reports/03-simulate.md`。
+
 ## 快速复现
 
 ```bash

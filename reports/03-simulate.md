@@ -42,9 +42,17 @@ diff mean 0.0077 rms 0.7213      最佳缩放比 0.958
 | v3 | 16 组满窗校准 + **Percentile**（去掉 SmoothQuant） | 编译 63 分钟仍在 compiler 阶段，同样异常，终止 |
 | v4 | 16 组满窗校准 + **MinMax**（与 v1 同方法，只换校准集） | 编译 **78 分钟**仍在 compiler 阶段（v1 只用 38 分钟），终止 |
 
-结论：在这张 17.12 GMAC 的图上，**Percentile 校准方法 + SmoothQuant 会让 Pulsar2 的
-compiler 阶段耗时失控**（MinMax 是 30 分钟量级，Percentile 63 分钟未完成）。
-时间成本上不可接受，暂时回到 MinMax。
+**关键发现（比"哪个方法更好"更值钱）**：v1→v4 唯一的变量是校准样本数 7→16，编译时间
+38 分钟 → 78 分钟仍未完成，基本呈线性。原因大概率是 `precision_analysis: EndToEnd`
+会对**每个校准样本**跑一遍全图逐层比对（33 个 NPU 子图 × 1500 个张量）。
+
+所以下一轮应该先关掉精度分析再试量化方法：
+
+```json
+"quant": { "precision_analysis": false, "precision_analysis_method": "PerLayer" }
+```
+
+预计能把单次编译压到 10–15 分钟，这样调量化参数才有意义。本次因为时间关系没来得及做。
 
 ## 待验证的改进方向（优先级从高到低）
 

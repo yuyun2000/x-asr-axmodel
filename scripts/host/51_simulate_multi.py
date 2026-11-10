@@ -54,7 +54,7 @@ def greedy(enc: np.ndarray, dec_path: str, joi_path: str, tokens: list[str]) -> 
     d = sd.run(None, {sd.get_inputs()[0].name: y})[0]
     en, dn = sj.get_inputs()[0].name, sj.get_inputs()[1].name
     hyp = []
-    for t in range(enc.shape[0]):
+    for t in range(enc.shape[1]):
         k = int(sj.run(None, {en: enc[:, t, :], dn: d})[0][0].argmax())
         if k != BLANK:
             hyp.append(k)
@@ -83,8 +83,8 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=4)
     args = ap.parse_args()
 
-    from magnetar.pulsar2_util import resolve_backend
-    from magnetar.stages.simulate import run as simulate_run
+    from magnetar.io_format import read_raw_float32, write_pulsar2_run_input
+    from magnetar.pulsar2_util import resolve_backend, run_pulsar2
 
     task = Path(args.task_dir).resolve()
     backend = resolve_backend()
@@ -99,11 +99,20 @@ def main() -> None:
     for wav in wavs:
         x = feats_for(wav)
         ref = sess.run(None, {"x4d": x})[0]
-        out_dir = task / "simulate" / "output"
-        if out_dir.exists():
-            shutil.rmtree(out_dir)
-        m = simulate_run(task, x, backend, input_name="x4d", output_name="encoder_out")
-        ax = np.fromfile(out_dir / "encoder_out.bin", dtype=np.float32).reshape(ref.shape)
+        # 每条样本用独立目录：pulsar2 run 会把输出目录里已存在的 bin 当成参考做 bit-true 比较
+        work = task / "simulate" / "multi" / wav.stem
+        if work.exists():
+            shutil.rmtree(work)
+        (work / "input").mkdir(parents=True)
+        (work / "output").mkdir(parents=True)
+        write_pulsar2_run_input(work / "input", "x4d", x)
+        run_pulsar2(backend, str(task),
+                    f"pulsar2 run --model {task/'compile'/'model.axmodel'} "
+                    f"--input_dir {work/'input'} --output_dir {work/'output'}",
+                    timeout=1800, log_file=work / "run.log")
+        ax = read_raw_float32(work / "output" / "encoder_out.bin", ref.shape)
+        m = {"cosine_similarity": float(ref.ravel() @ ax.ravel() / (np.linalg.norm(ref) * np.linalg.norm(ax))),
+             "mae": float(np.mean(np.abs(ref - ax)))}
         t_ref = greedy(ref, dec, joi, tokens)
         t_ax = greedy(ax, dec, joi, tokens)
         rows.append({

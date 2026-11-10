@@ -1,0 +1,38 @@
+[
+  {
+    "wav": "0.wav",
+    "cosine": 0.999012,
+    "mae": 0.0787,
+    "text_same": true,
+    "token_edit_distance": 0,
+    "onnx_text": "昨 天 是 MONDAY TODAY IS 礼 拜 二 THE DAY AFTER TOMORROW 是 星 期 三",
+    "axmodel_text": "昨 天 是 MONDAY TODAY IS 礼 拜 二 THE DAY AFTER TOMORROW 是 星 期 三"
+  },
+  {
+    "wav": "1.wav",
+    "cosine": 0.998276,
+    "mae": 0.0982,
+    "text_same": false,
+    "token_edit_distance": 10,
+    "onnx_text": "这 是 第 一 种 第 二 种 叫 呃 与 ALWAYS ALWAYS 什 么 意 思 啊",
+    "axmodel_text": "这 是 第 一 种 第 二 种 叫 呃 与 OS OS 什 么 意 思 啊"
+  },
+  {
+    "wav": "2.wav",
+    "cosine": 0.996739,
+    "mae": 0.1406,
+    "text_same": false,
+    "token_edit_distance": 3,
+    "onnx_text": "就 是 频 繁 的 啊 不 认 识 记 下 来 FREQUENTLY 频 繁 的",
+    "axmodel_text": "就 是 频 繁 的 啊 不 是 记 下 来 FREQUENTLY 频 繁 的"
+  },
+  {
+    "wav": "3.wav",
+    "cosine": 0.998375,
+    "mae": 0.1027,
+    "text_same": false,
+    "token_edit_distance": 3,
+    "onnx_text": "第 一 句 是 个 什 么 时 态 加 了 YES 时 一 般 现 在 时 我 们 把 它 时 态 写 上",
+    "axmodel_text": "第 一 句 是 个 什 么 时 态 加 了 E S 是 一 般 现 在 时 我 们 把 它 时 态 写 上"
+  }
+]

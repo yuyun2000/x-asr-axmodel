@@ -95,3 +95,25 @@ python run_asr.py --models-dir models --audio-dir models/test_wavs
   短音频补静音；
 - 模型是**无标点**版本（`tokens_nopunct`），需要标点得再接一个标点模型；
 - 中文输出的繁简取决于模型本身，本模型为简体（Qwen3-ASR 才有繁体问题，X-ASR 没有）。
+
+## 7. 常见问题
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| `ModuleNotFoundError: axengine` | 板端没装 AXERA 运行时 | 按板卡 SDK 安装 `axengine`（AXCL 主机还需装 AXCL runtime），或先用 `encoder.onnx` + onnxruntime 验证逻辑 |
+| `AX_ENGINE_CreateHandle failed` | axmodel 与芯片/驱动版本不匹配 | 确认编译时 `target_hardware=AX650`（AX630C/AX620Q 要重新编译），并核对板端 SDK 版本 |
+| 识别结果全是空格/空串 | 输入特征不对（采样率不是 16k、通道数不对、fbank 口径不一致） | 用 `test_wavs/0.wav` 先跑；确认 `wave` 读出来是 16 kHz 单声道 16-bit |
+| 长音频只出前半句 | 超过 10 s 的窗口没切分 | 用脚本默认的 8 s 步长切窗（`transcribe()` 已实现）；尾部 <5 s 的残段会被丢弃以避免重复出字 |
+| 输出没有标点 | 用的是无标点模型（`tokens_nopunct`） | 需要标点就再接一个标点模型，或换 punct 版权重重新导出 |
+| 内存不足 | encoder 需要 ~172 MB 权重 + 中间激活 | 板端至少留 1 GB 可用内存 |
+
+## 8. 换标点模型（可选）
+
+仓库里发布的 axmodel 是从 `pretrained.pt`（无标点）导出的。想用带标点版本：
+
+1. 下载 `fintuned_with_punctuation.pt` 与 `lang_5000_with_punctuation/tokens.txt`；
+2. 把 `scripts/host/10_export_onnx.sh` 里的 `XASR_CKPT` / `XASR_TOKENS` 指过去；
+3. 重新跑 `20_prep_task.py → 25 → 26 → 27 → 40_build.py`；
+4. 板端把 `tokens.txt` 换成带标点的版本。
+
+带标点版的解码逻辑完全相同，不需要改 `run_asr.py`。

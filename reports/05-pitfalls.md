@@ -113,3 +113,16 @@ AX650CModelError: assert(wdma[0].size == 0) error in .../cmodel/sys/sys_cv.cpp r
   `subgraph_npu_0` 上崩；而拆成 33 个子图（v1）时同一份 ONNX 能正常仿真（cosine 0.955）。
 - 判断：cmodel（软件仿真器）对超长单子图有 bug/限制，不是模型本身的问题。
 - 对策见 `reports/03-simulate.md` 的处理记录。
+
+## 12. 混精路径的 `Pow(x, -0.5)`
+
+```
+TileFailException("AxPow, AxPow only supports power with 0.25, 0.5, 2 and 4,
+                   howerver got [-0.5]") @ /encoder_embed/out_norm/Pow_1
+```
+
+- 现象：纯 INT8 能编过，但一开 `highest_mix_precision: true` 就编译失败；
+- 根因：LayerNorm 里的 20 处 `rsqrt` 被导出成 `Pow(x, -0.5)`，纯 INT8 路径下会被
+  融合进 `LayerNormalization`，混精打断融合后 `AxPow` 就遇到不支持的指数；
+- 处理：`28_fold_pow.py` 改写成 `1 / Sqrt(x)`（与 AX 官方 `Reciprocal → Div` 同理），
+  20 处替换后 `cosine = 1.00000000`（max diff 3.1e-5）。

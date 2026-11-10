@@ -6,6 +6,13 @@
 转换参考了 AXERA 官方的 [zipformer.axera](https://github.com/AXERA-TECH/zipformer.axera) 工程
 （U16 混合量化 + SmoothQuant + `conv_bias FP32` 那一套）。
 
+## 已发布的产物
+
+| 产物 | 位置 |
+|---|---|
+| sherpa-onnx PR（转换流水线） | <https://github.com/k2-fsa/sherpa-onnx/pull/4185> |
+| 板端模型（encoder.axmodel + decoder/joiner.onnx + tokens + 测试音频） | <https://huggingface.co/yunyu1258/x-asr-axmodel> |
+
 ## 板端用（模型下载后一行跑）
 
 ```bash
@@ -27,8 +34,8 @@ python deploy/python/run_asr.py --models-dir models --audio models/test_wavs/0.w
 | 4. Pulsar2 编译 | ✅ | `model.axmodel` 165 MB，**17.12 GMAC / 10 s**，单 NPU 子图 |
 | 5. 精度验收（cosine ≥ 0.99） | ✅ | **cosine 0.999012**，端到端文本与 ONNX 逐 token 一致，见 `reports/03-simulate.md` |
 | 6. 板端推理 + 部署文档 | 🚧 | `deploy/`（脚本已就绪，待板端实测） |
-| 7. HF 模型发布 | ⬜ | `scripts/host/60_upload_hf.py`（带精度门禁） |
-| 8. 上游 sherpa-onnx PR | ⬜ | `docs/03-upstream-plan.md` |
+| 7. HF 模型发布 | ✅ | <https://huggingface.co/yunyu1258/x-asr-axmodel> |
+| 8. 上游 sherpa-onnx PR | ✅ | <https://github.com/k2-fsa/sherpa-onnx/pull/4185> |
 
 ## 为什么是「离线 10 秒窗口」
 

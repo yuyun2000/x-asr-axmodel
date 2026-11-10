@@ -1,0 +1,13 @@
+# 本仓库走「先有 ONNX、再进 Magnetar」的路径，只用 COMPILE/SIMULATE 两个阶段。
+# 复制到任务目录后按需修改；SOURCE 指向本地 onnx，不需要联网下载权重。
+SOURCE=local:icefall-x-asr-encoder
+TARGET_HARDWARE=AX650
+NPU_MODE=NPU1
+MODEL_NAME=x_asr_encoder
+SDK_LANG=python
+BOARD=
+AUTO_APPROVE=true
+ALLOW_EXPLORE=false
+PULSAR2_VERSION=8.0
+PULSAR2_PACKAGE=lite
+CXX_TOOLCHAIN=

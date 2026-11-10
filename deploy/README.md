@@ -1,8 +1,12 @@
 # 板端部署指南
 
 目标：把 X-ASR（中英，0.16B）的 encoder 跑在 AX650 的 NPU 上，decoder/joiner 留在 CPU，
-10 秒窗口做离线识别。**本仓库的 axmodel 尚未通过精度验收**（见 `reports/03-simulate.md`），
-所以下面这条链路目前只到「结构跑通」，精度达标后再把模型替换掉即可——脚本不用改。
+10 秒窗口做离线识别。
+
+**当前状态**：仿真验证通过（Pulsar2 仿真 mean cosine **0.9981**，min 0.9967，
+文本 1/4 完全一致、其余仅少量英文词差异），模型已发布到 HuggingFace。
+**板端实机尚未验证**（手头没有 AX650 板卡）——下面的流程是脚本级验证过的（用 ONNX 后端
+跑通了同样的 fbank + 贪心搜索），上板后只需把 encoder 换成 `axengine`。
 
 ## 0. 你会拿到什么
 
@@ -16,7 +20,7 @@ tokens.txt           # 5000 token（无标点版）
 test_wavs/           # 4 条 16 kHz 单声道测试音频
 ```
 
-模型仓库地址（跑通精度后上传）：<https://huggingface.co/yunyu1258/x-asr-axmodel>
+模型仓库地址：<https://huggingface.co/yunyu1258/x-asr-axmodel>（已发布）
 
 ## 1. 板端环境
 
@@ -62,6 +66,18 @@ python run_asr.py --models-dir models --audio-dir models/test_wavs
 - **验证推理逻辑**：把 `run_asr.py` 里的 `InferenceSession` 换成 onnxruntime 就能在
   x86/macOS 上跑同一套 fbank + 贪心搜索（本仓库的 `scripts/local/03_check_fbank.py`
   就是这么验的）。
+
+## 4.1 推理脚本自测（无板可复现）
+
+把 `encoder.onnx`（fp32）放进模型目录，脚本会自动回退到 onnxruntime：
+
+```bash
+python run_asr.py --models-dir models --audio-dir models/test_wavs
+# [x-asr-axmodel] encoder backend: onnx; decoder backend: cpu-decoder
+# 0.wav  10.05s  昨天是 MONDAY TODAY IS 礼拜二 THE DAY AFTER TOMORROW 是星期三
+```
+
+在本仓库开发机上实测这四条测试音频的输出与 sherpa-onnx fp32/ONNX 参考完全一致。
 
 ## 5. 性能预期（待板端实测填表）
 

@@ -125,3 +125,29 @@ Pulsar2 不支持 `Log`，之前它把图切成 17 个 NPU + 16 个 CPU 子图�
 
 结论：**增加校准样本到 16 组没有明显收益**（cosine 互有高低、文本差异同量级），
 最终发布采用 8 组校准的模型（体积 165 MB，mean cosine 0.9981）。
+
+
+## 三方对比：fp32 ONNX / sherpa-onnx 官方 int8 / 我们的 axmodel
+
+同一批音频、同一套 fbank、同一份 tokens，逐 token 编辑距离（相对 fp32 ONNX 参考）：
+
+| wav | cosine | fp32 vs sherpa int8 | fp32 vs axmodel | 说明 |
+|---|---|---|---|---|
+| 0.wav | 0.999012 | 0 | **0** | 三者完全一致 |
+| 1.wav | 0.998276 | 0 | 10 | `ALWAYS ALWAYS` → `OS OS`（英文重复词） |
+| 2.wav | 0.996739 | 3 | **2** | axmodel 比 sherpa int8 更接近 fp32 |
+| 3.wav | 0.998375 | 5 | **2** | 两者都把 `YES` 解成 `E S`，其余 axmodel 更准 |
+| 合计 | — | **8** | **14** | 差异主要来自 1.wav 的英文重复词 |
+
+结论：**axmodel 的 INT8 质量与 sherpa-onnx 官方发布的 int8 ONNX 同一量级** ——
+2 条更接近 fp32、1 条持平、1 条（英文重复词）更差。原始数据见
+`reports/artifacts/three_way_u8_8calib.json`。
+
+### 试过但没提升/没成功的改进
+
+| 尝试 | 结果 |
+|---|---|
+| 校准集 7 → 16 组（含粤语长句） | cosine 互有高低，文本差异同量级，无收益 |
+| 校准集加入 88 s 英文长音频（noise1-en）+ 英文 rap | 1.wav 仍然 `OS OS`，cosine 略降（0.9984） |
+| SmoothQuant（官方默认开启） | Pulsar2 在 "Analysing Smooth Quantization Error" 之后被 SIGTERM（疑似内存峰值），未完成 |
+| U16 混合量化（官方 zipformer 配置） | 能编译，但 Pulsar2 的 cmodel 仿真在 U16 上直接崩（`AX650CModelError`），无法验证 → 不采用 |

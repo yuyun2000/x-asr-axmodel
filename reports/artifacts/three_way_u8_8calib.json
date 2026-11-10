@@ -1,0 +1,42 @@
+[
+ {
+  "wav": "0.wav",
+  "cosine": 0.999012,
+  "fp32_vs_sherpa": 0,
+  "fp32_vs_axmodel": 0,
+  "sherpa_vs_axmodel": 0,
+  "text_fp32": "昨 天 是 MONDAY TODAY IS 礼 拜 二 THE DAY AFTER TOMORROW 是 星 期 三",
+  "text_sherpa": "昨 天 是 MONDAY TODAY IS 礼 拜 二 THE DAY AFTER TOMORROW 是 星 期 三",
+  "text_axmodel": "昨 天 是 MONDAY TODAY IS 礼 拜 二 THE DAY AFTER TOMORROW 是 星 期 三"
+ },
+ {
+  "wav": "1.wav",
+  "cosine": 0.998276,
+  "fp32_vs_sherpa": 0,
+  "fp32_vs_axmodel": 10,
+  "sherpa_vs_axmodel": 10,
+  "text_fp32": "这 是 第 一 种 第 二 种 叫 呃 与 ALWAYS ALWAYS 什 么 意 思 啊",
+  "text_sherpa": "这 是 第 一 种 第 二 种 叫 呃 与 ALWAYS ALWAYS 什 么 意 思 啊",
+  "text_axmodel": "这 是 第 一 种 第 二 种 叫 呃 与 OS OS 什 么 意 思 啊"
+ },
+ {
+  "wav": "2.wav",
+  "cosine": 0.996739,
+  "fp32_vs_sherpa": 3,
+  "fp32_vs_axmodel": 2,
+  "sherpa_vs_axmodel": 5,
+  "text_fp32": "就 是 频 繁 的 啊 不 认 识 记 下 来 FREQUENTLY 频 繁 的",
+  "text_sherpa": "这 个 是 频 繁 的 啊 不 认 识 记 下 来 FREQUENTLY 频 繁",
+  "text_axmodel": "就 是 频 繁 的 啊 不 是 记 下 来 FREQUENTLY 频 繁 的"
+ },
+ {
+  "wav": "3.wav",
+  "cosine": 0.998375,
+  "fp32_vs_sherpa": 5,
+  "fp32_vs_axmodel": 2,
+  "sherpa_vs_axmodel": 3,
+  "text_fp32": "第 一 句 是 个 什 么 时 态 加 了 YES 时 一 般 现 在 时 我 们 把 它 时 态 写 上",
+  "text_sherpa": "第 一 句 是 个 什 么 时 态 加 了 E S 是 一 般 现 代 时 对 我 们 把 它 时 态 写 上 去",
+  "text_axmodel": "第 一 句 是 个 什 么 时 态 加 了 E S 是 一 般 现 在 时 我 们 把 它 时 态 写 上"
+ }
+]

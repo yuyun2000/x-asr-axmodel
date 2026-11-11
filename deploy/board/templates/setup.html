@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HTTPS 证书安装 · X-ASR</title>
+<link rel="stylesheet" href="/static/tokens.css">
+<link rel="stylesheet" href="/static/components.css">
+<style>
+  body { background: var(--m5-surface-subtle); }
+  .page { padding-block: var(--m5-space-2xl) var(--m5-space-4xl); }
+  .card {
+    padding: var(--m5-space-xl);
+    background: var(--m5-surface);
+    border: 1px solid var(--m5-line);
+    border-radius: var(--m5-radius-2xl);
+    margin-bottom: var(--m5-space-l);
+  }
+  h1 { font-size: var(--m5-font-h2); font-weight: 700; color: var(--m5-blue); margin-bottom: var(--m5-space-m); }
+  h2 { font-size: var(--m5-font-h3); font-weight: 700; margin-bottom: var(--m5-space-s); }
+  code, pre {
+    font-family: var(--m5-font-mono);
+    font-size: var(--m5-font-caption);
+  }
+  pre {
+    padding: var(--m5-space-m) var(--m5-space-l);
+    background: var(--m5-surface-subtle);
+    border: 1px solid var(--m5-line-soft);
+    border-radius: var(--m5-radius-md);
+    overflow-x: auto;
+  }
+  ol { list-style: decimal; padding-left: 1.4em; }
+  ol li { margin-bottom: .4em; }
+  .muted { color: var(--m5-ink-muted); font-size: var(--m5-font-caption); }
+  .row { display: flex; gap: var(--m5-space-m); flex-wrap: wrap; margin-top: var(--m5-space-l); }
+</style>
+</head>
+<body>
+
+<header class="m5-header">
+  <div class="m5-header__inner">
+    <a class="m5-logo" href="/">
+      <span class="m5-logo__mark">X</span>
+      <span>X-ASR<span class="m5-caption" style="margin-left:.5em">AX8850 NPU</span></span>
+    </a>
+    <a class="m5-btn m5-btn--ghost m5-btn--sm" href="/">返回</a>
+  </div>
+</header>
+
+<main class="m5-container page">
+  <h1>让 HTTPS 不再报警告</h1>
+  <p class="m5-section__desc">
+    麦克风必须在 HTTPS 页面才能用。当前用的是本机自签证书，浏览器第一次会提示
+    "您的连接不是私密连接"，点「高级 → 继续前往」就能用；
+    把下面的 CA 证书装进系统并信任之后，就不会再提示。
+  </p>
+
+  <div class="card">
+    <h2>第 0 步：下载 CA 证书</h2>
+    <p class="muted">文件名 <code>x-asr-local-ca.crt</code>，有效期 10 年，只用于这台板子的 HTTPS。</p>
+    <div class="row">
+      <a class="m5-btn m5-btn--primary" href="/asr-ca.crt">下载 CA 证书</a>
+      <a class="m5-btn m5-btn--outline" href="https://{{ host }}/">打开 HTTPS 页面</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>macOS / Chrome</h2>
+    <ol>
+      <li>下载 CA 证书，双击 → 钥匙串"系统"→ 添加</li>
+      <li>在钥匙串里找到 <code>X-ASR Local CA</code> → 双击 → 信任 → 使用此证书时选「始终信任」</li>
+      <li>或者一条命令（会提示输入密码）：
+        <pre>sudo security add-trusted-cert -d -r trustRoot \
+  -k /Library/Keychains/System.keychain ~/Downloads/x-asr-local-ca.crt</pre>
+      </li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>iPhone / iPad（Safari）</h2>
+    <ol>
+      <li>用 Safari 打开本页 → 下载 CA</li>
+      <li>设置 → 通用 → VPN与设备管理 → 安装该描述文件</li>
+      <li>设置 → 通用 → 关于本机 → 证书信任设置 → 打开 <code>X-ASR Local CA</code> 的开关</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>Android / Chrome</h2>
+    <ol>
+      <li>下载 CA（<code>.crt</code>）</li>
+      <li>设置 → 安全 → 加密与凭据 → 安装证书 → CA 证书</li>
+      <li>Chrome 重启后生效</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>Windows（Chrome / Edge）</h2>
+    <ol>
+      <li>双击 <code>.crt</code> → 安装证书 → 本地计算机 → 放入「受信任的根证书颁发机构」</li>
+    </ol>
+  </div>
+
+  <p class="muted">
+    不想安装证书也可以：直接打开 HTTPS 页面，点「高级 → 继续前往 192.168.10.144（不安全）」，
+    页面和麦克风都能正常用，只是每次浏览器重启会再提示一次。
+  </p>
+</main>
+
+<footer class="m5-footer">
+  <div class="m5-container">
+    <div class="m5-footer__bottom" style="border-top:none">
+      内部测试服务 · 不是 m5stack.com 官方站点
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

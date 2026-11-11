@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>X-ASR 语音识别 · AX650</title>
+<title>X-ASR 语音识别 · AX8850</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230282CB'/%3E%3Ctext x='50' y='72' font-size='58' font-family='sans-serif' font-weight='700' fill='white' text-anchor='middle'%3EX%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/tokens.css">
 <link rel="stylesheet" href="/static/components.css">
@@ -79,7 +79,34 @@
   .drop__title { font-size: var(--m5-font-body-l); font-weight: 600; color: var(--m5-ink); }
   .drop__hint { font-size: var(--m5-font-caption); color: var(--m5-ink-hint); }
 
-  .sample-row { display: flex; gap: var(--m5-space-s); flex-wrap: wrap; margin-top: var(--m5-space-l); }
+  .sample-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--m5-space-s);
+    margin-top: var(--m5-space-l);
+  }
+  .sample {
+    display: flex;
+    align-items: center;
+    gap: var(--m5-space-m);
+    padding: var(--m5-space-s) var(--m5-space-m);
+    background: var(--m5-surface-subtle);
+    border: 1px solid var(--m5-line-soft);
+    border-radius: var(--m5-radius-lg);
+    flex-wrap: wrap;
+  }
+  .sample__name { font-size: var(--m5-font-caption); color: var(--m5-ink-2); min-width: 64px; }
+  .sample audio { height: 32px; flex: 1 1 220px; min-width: 200px; max-width: 340px; }
+  .sample .m5-btn { flex: 0 0 auto; }
+
+  /* 上传后的试听条 */
+  .preview { margin-top: var(--m5-space-l); display: none; }
+  .preview.is-active { display: flex; align-items: center; gap: var(--m5-space-m); flex-wrap: wrap; }
+  .preview audio { height: 32px; flex: 1 1 240px; min-width: 200px; max-width: 420px; }
+
+  .https-note { margin-bottom: var(--m5-space-xl); }
+  .https-note[hidden] { display: none; }
+  .https-note a { color: var(--m5-blue); text-decoration: underline; }
 
   .result {
     margin-top: var(--m5-space-l);
@@ -135,23 +162,31 @@
   <div class="m5-header__inner">
     <a class="m5-logo" href="/">
       <span class="m5-logo__mark">X</span>
-      <span>X-ASR<span class="m5-caption" style="margin-left:.5em">AX650 NPU</span></span>
+      <span>X-ASR<span class="m5-caption" style="margin-left:.5em">AX8850 NPU</span></span>
     </a>
     <div class="m5-caption" id="stat">连接中…</div>
   </div>
 </header>
 
 <main class="m5-container page main">
+  <div class="m5-alert https-note" id="https-note" hidden>
+    <div>
+      <strong>麦克风需要 HTTPS。</strong>
+      当前是 http 页面，浏览器会禁用麦克风。
+      <a href="#" id="goto-https">打开 HTTPS 页面</a>（首次会提示证书，点"高级 → 继续前往"即可）。
+      想彻底去掉提示：<a href="/setup">按这里安装一次本地 CA 证书</a>（10 年有效，只用于这台板子）。
+    </div>
+  </div>
   <div class="page-head">
     <h1 class="m5-section-title page-head__title">语音识别</h1>
     <p class="m5-section__desc page-head__desc">
-      X-ASR 中英混说模型，encoder 跑在 AX650 的 NPU 上（INT8，10 秒窗口）。
+      X-ASR 中英混说模型，encoder 跑在 AX8850 的 NPU 上（INT8，10 秒窗口，同样兼容 AX650）。
       上传一段音频，或者直接对着麦克风说话。
     </p>
   </div>
 
   <div class="kpis">
-    <div class="kpi"><div class="kpi__label">encoder（NPU）</div><div class="kpi__value">80<em>ms / 10 s</em></div></div>
+    <div class="kpi"><div class="kpi__label">encoder（AX8850 NPU）</div><div class="kpi__value">80<em>ms / 10 s</em></div></div>
     <div class="kpi"><div class="kpi__label">端到端（10 s 音频）</div><div class="kpi__value">0.63<em>s · RTF 0.06</em></div></div>
     <div class="kpi"><div class="kpi__label">模型体积</div><div class="kpi__value">172<em>MB · INT8</em></div></div>
   </div>
@@ -171,7 +206,11 @@
         <div class="drop__hint">wav · mp3 · m4a · webm · ogg，10 秒以内一次推理</div>
       </div>
       <input type="file" id="file" accept="audio/*" hidden>
-      <div class="sample-row" id="samples"></div>
+      <div class="sample-list" id="samples"></div>
+      <div class="preview" id="preview">
+        <span class="m5-caption">试听</span>
+        <audio id="preview-audio" controls></audio>
+      </div>
       <div class="result is-empty" id="file-out">还没有识别结果。</div>
       <div class="meta" id="file-meta"></div>
     </div>
@@ -196,15 +235,15 @@
   <div class="m5-container">
     <div class="m5-footer__cols">
       <div>
-        <div class="m5-footer__title">X-ASR · AX650</div>
+        <div class="m5-footer__title">X-ASR · AX8850</div>
         <div class="m5-caption" style="color:var(--m5-ink-on-dark)">
-          Zipformer2 transducer · 中英混说 · INT8
+          Zipformer2 transducer · 中英混说 · INT8 · 兼容 AX650 系列
         </div>
       </div>
       <div>
         <div class="m5-footer__title">模型</div>
         <div class="m5-caption" style="color:var(--m5-ink-on-dark)">
-          encoder.axmodel（AX650 NPU）+ decoder / joiner（CPU）
+          encoder.axmodel（AX8850 NPU）+ decoder / joiner（CPU）
         </div>
       </div>
     </div>
@@ -256,6 +295,7 @@ fileInput.addEventListener('change', () => { if (fileInput.files.length) upload(
 async function upload(f) {
   const out = $('#file-out'), meta = $('#file-meta');
   setResult(out, meta, '识别中…', f.name, false);
+  showPreview(f);
   const fd = new FormData();
   fd.append('audio', f);
   try {
@@ -274,13 +314,43 @@ async function loadSamples() {
     const list = await (await fetch('/api/samples')).json();
     const box = $('#samples');
     for (const name of list) {
+      const row = document.createElement('div');
+      row.className = 'sample';
+
+      const label = document.createElement('span');
+      label.className = 'sample__name';
+      label.textContent = name;
+
+      const audio = document.createElement('audio');
+      audio.controls = true;
+      audio.preload = 'none';
+      audio.src = '/api/sample_audio/' + encodeURIComponent(name);
+
       const b = document.createElement('button');
       b.className = 'm5-btn m5-btn--ghost m5-btn--sm';
-      b.textContent = name;
-      b.addEventListener('click', () => runSample(name));
-      box.appendChild(b);
+      b.textContent = '识别这段';
+      b.addEventListener('click', () => { audio.pause(); runSample(name); });
+
+      row.append(label, audio, b);
+      box.appendChild(row);
     }
   } catch (e) { /* 忽略：示例加载失败不影响主功能 */ }
+}
+
+/* http 页面提示：麦克风必须 https */
+if (location.protocol === 'http:') {
+  const note = $('#https-note');
+  note.hidden = false;
+  $('#goto-https').href = 'https://' + location.hostname + ':8443/';
+}
+
+function showPreview(file) {
+  const box = $('#preview');
+  const audio = $('#preview-audio');
+  if (box._url) URL.revokeObjectURL(box._url);
+  box._url = URL.createObjectURL(file);
+  audio.src = box._url;
+  box.classList.add('is-active');
 }
 
 async function runSample(name) {

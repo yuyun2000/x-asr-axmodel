@@ -37,6 +37,7 @@ SAMPLES_DIR = "/root/x-asr/test_wavs"
 LOCK = threading.Lock()
 STATS = {"requests": 0, "audio_ms": 0.0, "infer_ms": 0.0}
 START_TIME = time.time()
+CA_DIR = "/root/x-asr/certs"
 
 
 def pcm_from_any(path: Path) -> np.ndarray:
@@ -78,6 +79,12 @@ def index():
     return render_template("index.html")
 
 
+@app.get("/setup")
+def setup_page():
+    host = request.host.split(":")[0]
+    return render_template("setup.html", host=host)
+
+
 @app.get("/api/health")
 def health():
     return jsonify({
@@ -87,6 +94,22 @@ def health():
         "uptime_s": round(time.time() - START_TIME, 1),
         **STATS,
     })
+
+
+@app.get("/asr-ca.crt")
+def ca_cert():
+    from flask import send_file
+    return send_file(str(Path(CA_DIR) / "ca.crt"), mimetype="application/x-x509-ca-cert",
+                     as_attachment=True, download_name="x-asr-local-ca.crt")
+
+
+@app.get("/api/sample_audio/<name>")
+def sample_audio(name):
+    from flask import send_file
+    path = Path(SAMPLES_DIR) / Path(name).name
+    if not path.is_file():
+        return jsonify({"error": f"no such sample: {name}"}), 404
+    return send_file(str(path), mimetype="audio/wav", conditional=True)
 
 
 @app.get("/api/samples")
@@ -141,26 +164,69 @@ def api_asr_pcm():
     return jsonify(_run(pcm))
 
 
-def make_cert(cert_dir: Path) -> tuple[str, str]:
+def make_cert(cert_dir: Path, ip: str) -> tuple[str, str]:
+    """生成自签 CA + 带 SAN 的服务器证书。
+
+    浏览器对没有 SAN 的旧式自签证书只给报错页；带 SAN（IP/域名）之后会走标准的
+    "高级 → 继续前往" 流程。把 CA 证书下载安装到系统后则完全无警告。
+    """
+    import subprocess
+
     cert_dir.mkdir(parents=True, exist_ok=True)
-    key, crt = cert_dir / "key.pem", cert_dir / "cert.pem"
-    if not (key.exists() and crt.exists()):
-        subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
-                        "-keyout", str(key), "-out", str(crt), "-days", "825",
-                        "-subj", "/CN=x-asr-ax650"], check=True,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return str(crt), str(key)
+    ca_key, ca_crt = cert_dir / "ca.key", cert_dir / "ca.crt"
+    srv_key, srv_crt = cert_dir / "key.pem", cert_dir / "cert.pem"
+    ext = cert_dir / "san.cnf"
+
+    if ca_crt.exists() and srv_crt.exists():
+        return str(srv_crt), str(srv_key)
+
+    def run(cmd):
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+         "-keyout", str(ca_key), "-out", str(ca_crt), "-days", "3650",
+         "-subj", "/CN=X-ASR Local CA", "-addext",
+         "basicConstraints=critical,CA:TRUE",
+         "-addext", "keyUsage=critical,keyCertSign,cRLSign"])
+
+    ext.write_text(
+        "basicConstraints=CA:FALSE\n"
+        "keyUsage=digitalSignature,keyEncipherment\n"
+        "extendedKeyUsage=serverAuth\n"
+        f"subjectAltName=IP:{ip},IP:127.0.0.1,DNS:localhost,DNS:ax8850.local,DNS:x-asr.local\n")
+
+    run(["openssl", "req", "-newkey", "rsa:2048", "-nodes",
+         "-keyout", str(srv_key), "-out", str(cert_dir / "server.csr"),
+         "-subj", "/CN=AX8850 X-ASR"])
+    run(["openssl", "x509", "-req", "-in", str(cert_dir / "server.csr"),
+         "-CA", str(ca_crt), "-CAkey", str(ca_key), "-CAcreateserial",
+         "-out", str(srv_crt), "-days", "825", "-sha256", "-extfile", str(ext)])
+    return str(srv_crt), str(srv_key)
+
+
+def local_ip() -> str:
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except Exception:
+        return "127.0.0.1"
+    finally:
+        s.close()
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--models-dir", default="/root/x-asr/models")
     ap.add_argument("--samples-dir", default="/root/x-asr/test_wavs")
-    ap.add_argument("--port", type=int, default=8443)
+    ap.add_argument("--https-ports", default="443,8443",
+                    help="HTTPS 端口列表，默认 443（不带端口即可访问）和 8443（兼容旧链接）")
+    ap.add_argument("--http-ports", default="80,8081",
+                    help="HTTP 端口列表（上传用；浏览器在 http 下禁用麦克风）")
     ap.add_argument("--no-ssl", action="store_true")
     ap.add_argument("--cert-dir", default="/root/x-asr/certs")
-    ap.add_argument("--http-port", type=int, default=8081,
-                    help="同时开一个 HTTP 端口（0 = 关闭）")
+    ap.add_argument("--ip", default="", help="证书 SAN 里的 IP，默认自动探测")
     args = ap.parse_args()
 
     global ASR, SAMPLES_DIR
@@ -170,20 +236,36 @@ def main() -> None:
 
     ssl_ctx = None
     if not args.no_ssl:
-        crt, key = make_cert(Path(args.cert_dir))
+        global CA_DIR
+        CA_DIR = args.cert_dir
+        ip = args.ip or local_ip()
+        crt, key = make_cert(Path(args.cert_dir), ip)
+        print(f"[x-asr] https certificate for IP {ip}, CA at /asr-ca.crt", flush=True)
         ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         ssl_ctx.load_cert_chain(crt, key)
 
     from werkzeug.serving import make_server
 
+    def parse(spec: str) -> list[int]:
+        return [int(x) for x in spec.replace(" ", "").split(",") if x]
+
     servers = []
-    srv = make_server("0.0.0.0", args.port, app, threaded=True, ssl_context=ssl_ctx)
-    servers.append((f"https://0.0.0.0:{args.port}", threading.Thread(
-        target=srv.serve_forever, daemon=True)))
-    if args.http_port:
-        srv2 = make_server("0.0.0.0", args.http_port, app, threaded=True)
-        servers.append((f"http://0.0.0.0:{args.http_port}", threading.Thread(
-            target=srv2.serve_forever, daemon=True)))
+    for port in ([] if args.no_ssl else parse(args.https_ports)):
+        try:
+            srv = make_server("0.0.0.0", port, app, threaded=True, ssl_context=ssl_ctx)
+        except OSError as e:
+            print(f"[x-asr] skip https :{port} ({e})", flush=True)
+            continue
+        servers.append((f"https://0.0.0.0:{port}", threading.Thread(
+            target=srv.serve_forever, daemon=True)))
+    for port in parse(args.http_ports):
+        try:
+            srv = make_server("0.0.0.0", port, app, threaded=True)
+        except OSError as e:
+            print(f"[x-asr] skip http :{port} ({e})", flush=True)
+            continue
+        servers.append((f"http://0.0.0.0:{port}", threading.Thread(
+            target=srv.serve_forever, daemon=True)))
 
     for addr, t in servers:
         t.start()

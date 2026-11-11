@@ -1,6 +1,6 @@
-# AX650 板端部署（实测通过）
+# AX8850 板端部署（实测通过）
 
-在 **AX650 开发板**（Ubuntu 22.04 aarch64，8 核，3.8 GB 内存）上跑 X-ASR encoder 的
+在 **AX8850 开发板（兼容 AX650）**（Ubuntu 22.04 aarch64，8 核，3.8 GB 内存）上跑 X-ASR encoder 的
 `axmodel`，并提供一个局域网页：上传音频 / 麦克风实时识别。
 
 ## 板端环境（实测）
@@ -24,6 +24,9 @@ pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple onnxruntime kaldi-nativ
 ## 部署步骤
 
 ```bash
+# 0. 端口：443（HTTPS）+ 80（HTTP）+ 8443/8081（兼容旧链接），均为 0.0.0.0
+#    如果 80/443 被别的服务占用，服务会跳过并在日志里打印 "skip http :80"
+
 # 1. 传模型（约 190 MB）
 mkdir -p /root/x-asr/models /root/x-asr/test_wavs
 cd /root/x-asr/models
@@ -48,9 +51,15 @@ python3 web_server.py --models-dir /root/x-asr/models --port 8443 --http-port 80
 
 浏览器打开（局域网任意设备）：
 
-- **https://192.168.10.144:8443/** —— 完整功能（含麦克风）。自签名证书，浏览器提示
-  "不安全"→ 高级 → 继续访问。
-- **http://192.168.10.144:8081/** —— 只上传（`http` 下浏览器禁用麦克风）。
+| 入口 | 说明 |
+|---|---|
+| **https://192.168.10.144/** | 完整功能（上传 + 示例试听 + 麦克风），默认监听 443（同时保留 8443） |
+| **http://192.168.10.144/** | 上传 / 试听（`http` 下浏览器禁用麦克风），监听 80（同时保留 8081） |
+| **http://192.168.10.144/setup** | HTTPS 证书安装说明：下载本地 CA，按系统装一次就无警告 |
+
+首次打开 HTTPS 会提示"您的连接不是私密连接"，点 **高级 → 继续前往** 即可使用（麦克风可用）；
+装过 CA 之后不再提示。证书由板端首次启动时用 openssl 生成的本地 CA 签出，
+SAN 含 `IP:192.168.10.144`、`DNS:localhost`、`DNS:ax8850.local`，有效期 825 天。
 
 页面用 **M5Stack 官网设计语言**（`static/tokens.css` + `static/components.css`，与前缀
 `m5-` 的组件类），模板在 `templates/index.html`：
@@ -66,6 +75,7 @@ python3 web_server.py --models-dir /root/x-asr/models --port 8443 --http-port 80
 ```bash
 cp x-asr.service /etc/systemd/system/
 systemctl daemon-reload && systemctl enable --now x-asr
+systemctl status x-asr --no-pager
 ```
 
 ## 实测性能（板端，10.05 s 音频）
@@ -109,12 +119,15 @@ systemctl daemon-reload && systemctl enable --now x-asr
 | `POST /api/asr` | multipart `audio=@file.wav`（支持 wav/mp3/m4a/webm/ogg，服务端 ffmpeg 转 PCM） |
 | `POST /api/asr_pcm?rate=16000` | raw PCM int16 小端，麦克风流式用；`rate != 16000` 时服务端 FFT 重采样 |
 | `GET /api/samples` | 板端自带测试音频列表 |
+| `GET /api/sample_audio/<name>` | 示例音频流（网页里的播放器直接用这个） |
+| `GET /asr-ca.crt` | 下载本地 CA 证书 |
+| `GET /setup` | 证书安装说明页 |
 | `POST /api/asr_sample` | `{"name": "0.wav"}` 直接跑自带音频 |
 
 ```bash
-curl -F "audio=@test.wav" http://192.168.10.144:8081/api/asr
+curl -F "audio=@test.wav" http://192.168.10.144/api/asr
 curl -X POST -H 'Content-Type: application/json' \
-     -d '{"name":"0.wav"}' http://192.168.10.144:8081/api/asr_sample
+     -d '{"name":"0.wav"}' http://192.168.10.144/api/asr_sample
 ```
 
 ## 已知限制

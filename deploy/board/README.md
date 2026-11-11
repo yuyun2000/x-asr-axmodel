@@ -31,6 +31,8 @@ pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple onnxruntime kaldi-nativ
 mkdir -p /root/x-asr/models /root/x-asr/test_wavs
 cd /root/x-asr/models
 #   encoder.axmodel / decoder.onnx / joiner.onnx / tokens.txt
+#   可选（推荐）：decoder.axmodel、joiner.u16.axmodel、joiner.axmodel
+#                  —— joiner 上 NPU 后解码从 1.36ms/帧 降到 0.28ms/帧
 #   从 HuggingFace 下载：huggingface-cli download yunyu1258/x-asr-axmodel --local-dir .
 #   或者从开发机 scp / curl 过来
 
@@ -83,10 +85,15 @@ systemctl status x-asr --no-pager
 | 项 | 值 |
 |---|---|
 | encoder（NPU，10 s 窗口） | **80 ms** |
-| decoder + joiner（CPU，4 线程） | 250–400 ms |
+| joiner（NPU，U16，248 次） | 70 ms（0.28 ms/次） |
+| decoder（CPU，保留 fp32） | 35–40 ms |
 | fbank（kaldi-native-fbank） | 70–145 ms |
-| **端到端** | **629 ms**（10.05 s）/ 402 ms（4.7 s）/ 598 ms（8.8 s） |
-| **RTF** | **0.063 – 0.086** |
+| **端到端** | **360 ms**（10.05 s）/ 232 ms（4.7 s）/ 331 ms（8.8 s） |
+| **RTF** | **0.036 – 0.050** |
+
+> decoder / joiner 的量化方案与取舍见 `reports/07-aux-on-npu.md`：
+> 默认 `aux_backend="auto"` = joiner 上 NPU(U16) + decoder 留 CPU（域内文本与 fp32 逐字一致）；
+> `aux_backend="npu"` 可全 NPU（更快，长句/域外语料有偏差）。
 | 服务进程内存 | ~293 MB RSS |
 | 编码器体积 | 172 MB（INT8） |
 
@@ -96,6 +103,7 @@ systemctl status x-asr --no-pager
 |---|---|
 | 只用有效帧解码（`valid_encoder_frames`，0.30·T+20 上界） | 10 s 音频不变，5 s 音频 760→273 ms |
 | joiner ONNX 用 4 线程（`intra_op_num_threads=4`） | 解码 670→400 ms（joiner 2.86→1.40 ms/帧） |
+| **joiner 转 axmodel（U16）放 NPU** | 解码 400→122 ms（1.40→0.28 ms/帧），域内文本不变 |
 | fbank 换 `kaldi-native-fbank` | 347→145 ms（纯 numpy 实现的 1/2.4） |
 
 ## 识别结果（板端 vs fp32 ONNX）

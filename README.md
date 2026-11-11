@@ -33,7 +33,8 @@ SmoothQuant 编译被 SIGTERM，最终交付纯 INT8（质量与 sherpa-onnx 官
 http 访问时页面会提示麦克风需要 HTTPS：![提示](docs/images/web-http-notice.png)
 装一次本地 CA 就能彻底去掉证书警告：![setup](docs/images/web-setup.png)
 
-实测（10.05 s 音频）：encoder **80 ms**（NPU）+ 解码 400 ms + fbank 145 ms = **629 ms，RTF 0.063**；
+实测（10.05 s 音频）：encoder **80 ms**（NPU）+ joiner **70 ms**（NPU，U16）+ decoder 38 ms（CPU）+ fbank 145 ms
+= **360 ms，RTF 0.036**（decoder/joiner 取舍见 `reports/07-aux-on-npu.md`）；
 4 条测试音频里 **2 条与 fp32 ONNX 完全一致**，另 2 条只有英文词/近音差异。
 部署细节见 [deploy/board/README.md](deploy/board/README.md)，性能报告 `reports/06-board-deploy.md`。
 
@@ -65,7 +66,8 @@ python deploy/python/run_asr.py --models-dir models --audio models/test_wavs/0.w
 | 3.5 Log→Softplus（99 处） | ✅ | `scripts/host/27_fold_swoosh.py`，33 子图 → **1 个 NPU 子图**，cosine 1.0 |
 | 4. Pulsar2 编译 | ✅ | `model.axmodel` 165 MB，**17.12 GMAC / 10 s**，单 NPU 子图 |
 | 5. 精度验收（cosine ≥ 0.99） | ✅ | **cosine 0.999012**，端到端文本与 ONNX 逐 token 一致，见 `reports/03-simulate.md` |
-| 6. 板端推理 + 部署文档 | ✅ | AX8850 实机跑通：`deploy/board/`（ctypes 引擎 + Flask 网页服务），RTF 0.063 |
+| 6. 板端推理 + 部署文档 | ✅ | AX8850 实机跑通：`deploy/board/`（ctypes 引擎 + Flask 网页服务），RTF 0.036 |
+| 6.5 decoder / joiner 上 NPU | ✅ | joiner U16 上 NPU（0.28 ms/帧，域内文本与 fp32 一致）；decoder 可上 NPU（`aux_backend="npu"`） |
 | 7. HF 模型发布 | ✅ | <https://huggingface.co/yunyu1258/x-asr-axmodel> |
 | 8. 上游 sherpa-onnx PR | ✅ | <https://github.com/k2-fsa/sherpa-onnx/pull/4185> |
 

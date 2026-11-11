@@ -180,15 +180,16 @@
   <div class="page-head">
     <h1 class="m5-section-title page-head__title">语音识别</h1>
     <p class="m5-section__desc page-head__desc">
-      X-ASR 中英混说模型，encoder 跑在 AX8850 的 NPU 上（INT8，10 秒窗口，同样兼容 AX650）。
+      X-ASR 中英混说模型。encoder（INT8）和 joiner（U16）都跑在 AX8850 的 NPU 上，
+      decoder 留在 CPU 保精度；10 秒窗口，同样兼容 AX650。
       上传一段音频，或者直接对着麦克风说话。
     </p>
   </div>
 
   <div class="kpis">
     <div class="kpi"><div class="kpi__label">encoder（AX8850 NPU）</div><div class="kpi__value">80<em>ms / 10 s</em></div></div>
-    <div class="kpi"><div class="kpi__label">端到端（10 s 音频）</div><div class="kpi__value">0.63<em>s · RTF 0.06</em></div></div>
-    <div class="kpi"><div class="kpi__label">模型体积</div><div class="kpi__value">172<em>MB · INT8</em></div></div>
+    <div class="kpi"><div class="kpi__label">端到端（10 s 音频）</div><div class="kpi__value">0.35<em>s · RTF 0.035</em></div></div>
+    <div class="kpi"><div class="kpi__label">NPU 模型</div><div class="kpi__value">180<em>MB · INT8/U16</em></div></div>
   </div>
 
   <div class="tabs" role="tablist">
@@ -243,7 +244,7 @@
       <div>
         <div class="m5-footer__title">模型</div>
         <div class="m5-caption" style="color:var(--m5-ink-on-dark)">
-          encoder.axmodel（AX8850 NPU）+ decoder / joiner（CPU）
+          encoder INT8 + joiner U16 在 AX8850 NPU；decoder 在 CPU 保精度
         </div>
       </div>
     </div>

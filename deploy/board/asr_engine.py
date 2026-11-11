@@ -174,7 +174,15 @@ def clean_text(text: str) -> str:
 
 
 class Asr:
-    def __init__(self, models_dir: str | Path):
+    def __init__(self, models_dir: str | Path, aux_backend: str = "auto"):
+        """aux_backend:
+
+        - ``auto``（默认，精度优先）：decoder 留在 CPU（fp32，避免自回归漂移），
+          joiner 放 NPU（U16，每帧一次的热路径）
+        - ``npu``：decoder、joiner 都放 NPU（最快；长句 / 域外语料会有细微偏差）
+        - ``ort``：两个都在 CPU（基线）
+        ``*.axmodel`` 不存在时自动回退到 CPU。
+        """
         d = Path(models_dir)
         self.enc = AxEngine(str(d / "encoder.axmodel"))
         self.io = self.enc.describe()
@@ -182,15 +190,35 @@ class Asr:
         self.frames = in_shape[2]
         self.out_shape = self.io["outputs"][0]["shape"]
 
-        # 小模型在 AX650 的弱核上单线程吃力，joiner 用 4 线程能快约 2 倍
-        so = ort.SessionOptions()
-        so.intra_op_num_threads = 4
-        so.inter_op_num_threads = 1
-        so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-        self.dec = ort.InferenceSession(str(d / "decoder.onnx"), so,
-                                        providers=["CPUExecutionProvider"])
-        self.joi = ort.InferenceSession(str(d / "joiner.onnx"), so,
-                                        providers=["CPUExecutionProvider"])
+        mode = aux_backend if aux_backend in ("auto", "npu", "ort") else "auto"
+        want_dec_npu = mode == "npu"
+        want_joi_npu = mode in ("auto", "npu")
+
+        self.dec_ax = self.joi_ax = None
+        if want_dec_npu and (d / "decoder.axmodel").exists():
+            self.dec_ax = AxEngine(str(d / "decoder.axmodel"))
+        if want_joi_npu:
+            for cand in (d / "joiner.u16.axmodel", d / "joiner.axmodel"):
+                if cand.exists():
+                    self.joi_ax = AxEngine(str(cand))
+                    break
+
+        self.dec = self.joi = None
+        if self.dec_ax is None or self.joi_ax is None:
+            # 小模型在弱核上单线程吃力，4 线程能快约 2 倍
+            so = ort.SessionOptions()
+            so.intra_op_num_threads = 4
+            so.inter_op_num_threads = 1
+            so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+            if self.dec_ax is None:
+                self.dec = ort.InferenceSession(str(d / "decoder.onnx"), so,
+                                                providers=["CPUExecutionProvider"])
+            if self.joi_ax is None:
+                self.joi = ort.InferenceSession(str(d / "joiner.onnx"), so,
+                                                providers=["CPUExecutionProvider"])
+        self.aux_backend = ("npu" if self.dec_ax else "ort") + "+" + (
+            "npu" if self.joi_ax else "ort")
+
         self.tokens = [l.split()[0] for l in
                        (d / "tokens.txt").read_text(encoding="utf-8").splitlines() if l]
 
@@ -206,23 +234,31 @@ class Asr:
         raw = np.frombuffer(data, dtype=np.float32).reshape(shape)[0]
         return raw, dt
 
+    def _decoder(self, y: np.ndarray) -> np.ndarray:
+        if self.dec_ax is not None:
+            shape, data = self.dec_ax.run([y.astype(np.float32)])[0]
+            return np.frombuffer(data, dtype=np.float32).reshape(shape)
+        return self.dec.run(None, {self.dec.get_inputs()[0].name: y})[0]
+
     def greedy(self, enc: np.ndarray) -> str:
         y = np.zeros((1, CTX), dtype=np.int64)
-        dec_in = self.dec.get_inputs()[0].name
-        dec = self.dec.run(None, {dec_in: y})[0]
-        j_in = [i.name for i in self.joi.get_inputs()]
+        dec = self._decoder(y)
+        j_in = None if self.joi_ax is not None else [i.name for i in self.joi.get_inputs()]
         hyp = []
         for t in range(enc.shape[0]):
-            logit = self.joi.run(None, {j_in[0]: enc[t:t + 1].astype(np.float32),
-                                        j_in[1]: dec})[0]
+            if self.joi_ax is not None:
+                shape, data = self.joi_ax.run([enc[t:t + 1].astype(np.float32), dec])[0]
+                logit = np.frombuffer(data, dtype=np.float32).reshape(shape)
+            else:
+                logit = self.joi.run(None, {j_in[0]: enc[t:t + 1].astype(np.float32),
+                                            j_in[1]: dec})[0]
             k = int(logit.reshape(-1).argmax())
             if k != BLANK:
                 hyp.append(k)
                 y = np.array([[y[0, 1], k]], dtype=np.int64)
-                dec = self.dec.run(None, {dec_in: y})[0]
+                dec = self._decoder(y)
         text = "".join(self.tokens[i] for i in hyp)
         return clean_text(text)
-
 
     def transcribe(self, pcm: np.ndarray, hop_frames: int = 800,
                    min_tail: int = 500, trim: bool = False) -> dict:

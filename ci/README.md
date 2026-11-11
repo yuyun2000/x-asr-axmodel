@@ -15,7 +15,7 @@ gh run watch --repo yuyun2000/x-asr-axmodel
 
 1. 在 icefall CPU 容器里导出静态 fp32 ONNX（10 s 窗口）+ 图改写 + 校准集；
 2. 宿主机下载 Pulsar2 8.0 lite 包（830 MB），修掉包里两个启动脚本路径 bug；
-3. `pulsar2 build` 编译 encoder（40–90 min）；
+3. `pulsar2 build` 编译 encoder（实测 34 min 26 s，峰值内存 9.27 GB，产物 165 MB）；
 4. `pulsar2 run` 仿真验证（cosine / MAE）；
 5. 上传 `encoder.axmodel` 作为 artifact。
 

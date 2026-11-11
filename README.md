@@ -10,6 +10,19 @@
 官方默认的 U16 混合量化与 SmoothQuant 也试过，但 Pulsar2 的 cmodel 仿真在 U16 上会崩、
 SmoothQuant 编译被 SIGTERM，最终交付纯 INT8（质量与 sherpa-onnx 官方 int8 模型同量级）。
 
+## 板端实机（AX650，2026-11-11 验证）
+
+网页直接跑在板子上，局域网任意设备可访问：
+
+| 入口 | 功能 |
+|---|---|
+| **https://192.168.10.144:8443/** | 上传音频 + **麦克风实时识别**（自签名证书，需点"继续访问"） |
+| http://192.168.10.144:8081/ | 上传音频（浏览器在 http 下禁用麦克风） |
+
+实测（10.05 s 音频）：encoder **80 ms**（NPU）+ 解码 400 ms + fbank 145 ms = **629 ms，RTF 0.063**；
+4 条测试音频里 **2 条与 fp32 ONNX 完全一致**，另 2 条只有英文词/近音差异。
+部署细节见 [deploy/board/README.md](deploy/board/README.md)，性能报告 `reports/06-board-deploy.md`。
+
 ## 已发布的产物
 
 | 产物 | 位置 |
@@ -38,7 +51,7 @@ python deploy/python/run_asr.py --models-dir models --audio models/test_wavs/0.w
 | 3.5 Log→Softplus（99 处） | ✅ | `scripts/host/27_fold_swoosh.py`，33 子图 → **1 个 NPU 子图**，cosine 1.0 |
 | 4. Pulsar2 编译 | ✅ | `model.axmodel` 165 MB，**17.12 GMAC / 10 s**，单 NPU 子图 |
 | 5. 精度验收（cosine ≥ 0.99） | ✅ | **cosine 0.999012**，端到端文本与 ONNX 逐 token 一致，见 `reports/03-simulate.md` |
-| 6. 板端推理 + 部署文档 | 🚧 | `deploy/`（脚本已就绪，待板端实测） |
+| 6. 板端推理 + 部署文档 | ✅ | AX650 实机跑通：`deploy/board/`（ctypes 引擎 + Flask 网页服务），RTF 0.063 |
 | 7. HF 模型发布 | ✅ | <https://huggingface.co/yunyu1258/x-asr-axmodel> |
 | 8. 上游 sherpa-onnx PR | ✅ | <https://github.com/k2-fsa/sherpa-onnx/pull/4185> |
 

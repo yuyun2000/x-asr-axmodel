@@ -1,0 +1,16 @@
+[Unit]
+Description=X-ASR AX650 web service (upload + microphone ASR)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/x-asr
+ExecStart=/usr/bin/python3 /root/x-asr/web_server.py --models-dir /root/x-asr/models --port 8443 --http-port 8081 --samples-dir /root/x-asr/test_wavs
+Restart=always
+RestartSec=3
+StandardOutput=append:/root/x-asr/web.log
+StandardError=append:/root/x-asr/web.log
+
+[Install]
+WantedBy=multi-user.target

@@ -1,7 +1,7 @@
-# X-ASR → AX650 AXMODEL
+# X-ASR → AX8850 AXMODEL（兼容 AX650）
 
 把 [X-ASR-zh-en](https://huggingface.co/GilgameshWind/X-ASR-zh-en)（0.16B，Zipformer2 transducer，
-中英双语，Apache-2.0）的离线 encoder 转换成 AXERA AX650 的 axmodel，并给出板端推理与复现流程。
+中英双语，Apache-2.0）的离线 encoder 转换成 AXERA AX8850 的 axmodel（编译目标 AX650，AX650 系列同包兼容），并给出板端推理与复现流程。
 
 转换时对照了 AXERA 官方的 [zipformer.axera](https://github.com/AXERA-TECH/zipformer.axera) 工程：
 官方用 `cut_reciprocal_encoder.py` 把 NPU 不支持的 `Reciprocal` 换成 `Div`；我们这边对应的是
@@ -10,7 +10,7 @@
 官方默认的 U16 混合量化与 SmoothQuant 也试过，但 Pulsar2 的 cmodel 仿真在 U16 上会崩、
 SmoothQuant 编译被 SIGTERM，最终交付纯 INT8（质量与 sherpa-onnx 官方 int8 模型同量级）。
 
-## 板端实机（AX650，2026-11-11 验证）
+## 板端实机（AX8850，2026-11-11 验证）
 
 网页直接跑在板子上（AX8850，模型与 AX650 兼容），局域网任意设备可访问：
 
@@ -65,13 +65,13 @@ python deploy/python/run_asr.py --models-dir models --audio models/test_wavs/0.w
 | 3.5 Log→Softplus（99 处） | ✅ | `scripts/host/27_fold_swoosh.py`，33 子图 → **1 个 NPU 子图**，cosine 1.0 |
 | 4. Pulsar2 编译 | ✅ | `model.axmodel` 165 MB，**17.12 GMAC / 10 s**，单 NPU 子图 |
 | 5. 精度验收（cosine ≥ 0.99） | ✅ | **cosine 0.999012**，端到端文本与 ONNX 逐 token 一致，见 `reports/03-simulate.md` |
-| 6. 板端推理 + 部署文档 | ✅ | AX650 实机跑通：`deploy/board/`（ctypes 引擎 + Flask 网页服务），RTF 0.063 |
+| 6. 板端推理 + 部署文档 | ✅ | AX8850 实机跑通：`deploy/board/`（ctypes 引擎 + Flask 网页服务），RTF 0.063 |
 | 7. HF 模型发布 | ✅ | <https://huggingface.co/yunyu1258/x-asr-axmodel> |
 | 8. 上游 sherpa-onnx PR | ✅ | <https://github.com/k2-fsa/sherpa-onnx/pull/4185> |
 
 ## 精度结果
 
-Pulsar2 仿真（AX650），同一批音频、同一套 fbank：
+Pulsar2 仿真（target_hardware=AX650，AX8850 同包兼容），同一批音频、同一套 fbank：
 
 | wav | cosine（ONNX vs AXMODEL） | 文本（相对 fp32 ONNX 的 token 编辑距离） | 对照：sherpa-onnx 官方 int8 |
 |---|---|---|---|
@@ -113,7 +113,7 @@ assets/           tokens.txt（Apache-2.0，来源见 NOTICE）
 - 转换主机：`m5stack@192.168.20.38`（Ubuntu 24.04 / x86_64 / 16 核 / 62 GB）
   - Magnetar `~/AX-model/Magnetar`，Pulsar2 8.0 `~/.cache/magnetar/pulsar2/8.0`
   - base venv：Python 3.10 + torch 2.14.1+cpu + onnx 1.22 + ort 1.23.2
-- 目标芯片：AX650（Pulsar2 仿真验证；板端验证需要 AXCL 或开发板）
+- 目标芯片：AX8850（编译目标 AX650，已在 AX8850 实机验证）
 
 ## 复现
 

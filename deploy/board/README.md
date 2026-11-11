@@ -31,8 +31,13 @@ cd /root/x-asr/models
 #   从 HuggingFace 下载：huggingface-cli download yunyu1258/x-asr-axmodel --local-dir .
 #   或者从开发机 scp / curl 过来
 
-# 2. 传本目录脚本
+# 2. 传本目录脚本（web 页面需要 templates/ 与 static/ 一起传）
 #   ax_engine.py  asr_engine.py  web_server.py  test_board.py
+#   templates/index.html
+#   static/tokens.css  static/components.css
+
+# 目录结构（部署后）
+#   /root/x-asr/{ax_engine.py,asr_engine.py,web_server.py,templates/,static/,models/,test_wavs/}
 
 # 3. 先跑命令行自检
 cd /root/x-asr && python3 test_board.py
@@ -47,7 +52,14 @@ python3 web_server.py --models-dir /root/x-asr/models --port 8443 --http-port 80
   "不安全"→ 高级 → 继续访问。
 - **http://192.168.10.144:8081/** —— 只上传（`http` 下浏览器禁用麦克风）。
 
-![web](../docs/images/web-upload.png)
+页面用 **M5Stack 官网设计语言**（`static/tokens.css` + `static/components.css`，与前缀
+`m5-` 的组件类），模板在 `templates/index.html`：
+
+| 上传 | 麦克风 |
+|---|---|
+| ![上传](../docs/images/web-upload.png) | ![麦克风](../docs/images/web-mic.png) |
+
+移动端（390 px）自适应：![移动端](../docs/images/web-mobile.png)
 
 ### 开机自启（可选）
 

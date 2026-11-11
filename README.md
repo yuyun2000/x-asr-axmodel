@@ -19,6 +19,13 @@ SmoothQuant 编译被 SIGTERM，最终交付纯 INT8（质量与 sherpa-onnx 官
 | **https://192.168.10.144:8443/** | 上传音频 + **麦克风实时识别**（自签名证书，需点"继续访问"） |
 | http://192.168.10.144:8081/ | 上传音频（浏览器在 http 下禁用麦克风） |
 
+页面按 M5Stack 官网设计语言实现（蓝色标题、1px 细描边卡片、胶囊按钮、黑色页脚），
+支持文件上传 / 示例音频 / 麦克风实时识别，桌面与手机都能用。
+
+| 上传 + 识别结果 | 麦克风 |
+|---|---|
+| ![上传](docs/images/web-upload.png) | ![麦克风](docs/images/web-mic.png) |
+
 实测（10.05 s 音频）：encoder **80 ms**（NPU）+ 解码 400 ms + fbank 145 ms = **629 ms，RTF 0.063**；
 4 条测试音频里 **2 条与 fp32 ONNX 完全一致**，另 2 条只有英文词/近音差异。
 部署细节见 [deploy/board/README.md](deploy/board/README.md)，性能报告 `reports/06-board-deploy.md`。

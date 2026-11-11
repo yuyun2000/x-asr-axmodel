@@ -14,6 +14,14 @@
 | 识别质量 | 4 条测试音频中 **2 条与 fp32 ONNX 完全一致**，另 2 条仅英文词/近音差异 |
 | 网页服务 | ✅ `https://192.168.10.144:8443/`（上传 + 麦克风）与 `http://192.168.10.144:8081/`（上传） |
 
+## 网页服务
+
+- 页面：M5Stack 设计语言（`deploy/board/static/tokens.css` + `components.css`，
+  `templates/index.html`），上传 / 示例音频 / 麦克风三个入口；
+- 麦克风走 `AudioContext` + `ScriptProcessor` 采集 16 kHz PCM，每 1.2 s POST 最近 10 s 音频，
+  边录边出字；浏览器上下文不是 16 kHz 时服务端 FFT 重采样；
+- 桌面 1440 px 与移动端 390 px 均无横向滚动（Chrome headless 实测 `scrollWidth == innerWidth`）。
+
 ## 关键实现
 
 板卡上没有 PyPI 的 `axengine`，AX 示例也都是 C/C++。为了不让部署依赖交叉编译，

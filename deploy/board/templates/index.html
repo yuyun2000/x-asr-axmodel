@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>X-ASR 语音识别 · AX650</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230282CB'/%3E%3Ctext x='50' y='72' font-size='58' font-family='sans-serif' font-weight='700' fill='white' text-anchor='middle'%3EX%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/tokens.css">
+<link rel="stylesheet" href="/static/components.css">
+<style>
+  html, body { height: 100%; }
+  body {
+    display: flex;
+    flex-direction: column;
+    background: var(--m5-surface-subtle);
+  }
+  main.main { flex: 1 0 auto; }
+  .m5-footer { flex-shrink: 0; }
+
+  /* 页面局部样式：只在 M5 token 之上做排版，不引入新颜色 */
+  .page { padding-block: var(--m5-space-2xl) var(--m5-space-4xl); }
+
+  .page-head { margin-bottom: var(--m5-space-xl); }
+  .page-head__title { margin-bottom: var(--m5-space-s); }
+  .page-head__desc { max-width: 62ch; color: var(--m5-ink-2); }
+
+  .kpis {
+    display: grid;
+    gap: var(--m5-space-l);
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    margin-bottom: var(--m5-space-2xl);
+  }
+  .kpi {
+    padding: var(--m5-space-l) var(--m5-space-xl);
+    background: var(--m5-surface);
+    border: 1px solid var(--m5-line);
+    border-radius: var(--m5-radius-xl);
+  }
+  .kpi__label { font-size: var(--m5-font-caption); color: var(--m5-ink-hint); }
+  .kpi__value {
+    margin-top: 2px;
+    font-size: var(--m5-font-h3);
+    font-weight: 700;
+    color: var(--m5-ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .kpi__value { white-space: nowrap; }
+  .kpi__value em { font-style: normal; font-size: var(--m5-font-caption); font-weight: 500;
+                   color: var(--m5-ink-hint); margin-left: 2px; }
+
+  .tabs { display: flex; gap: var(--m5-space-s); margin-bottom: var(--m5-space-l); flex-wrap: wrap; }
+  .tabs .m5-btn { min-width: 132px; }
+  .tabs .m5-btn.is-active { color: #fff; background: var(--m5-blue); border-color: var(--m5-blue); }
+
+  .pane { display: none; }
+  .pane.is-active { display: block; }
+
+  .panel {
+    padding: var(--m5-space-xl);
+    background: var(--m5-surface);
+    border: 1px solid var(--m5-line);
+    border-radius: var(--m5-radius-2xl);
+  }
+
+  .drop {
+    display: grid;
+    place-items: center;
+    gap: var(--m5-space-s);
+    padding: var(--m5-space-3xl) var(--m5-space-xl);
+    text-align: center;
+    color: var(--m5-ink-muted);
+    border: 1px dashed var(--m5-line-strong);
+    border-radius: var(--m5-radius-xl);
+    cursor: pointer;
+    transition: border-color var(--m5-dur) var(--m5-ease),
+                background-color var(--m5-dur) var(--m5-ease);
+  }
+  .drop:hover, .drop.is-hover { border-color: var(--m5-blue); background: rgba(2, 130, 203, .04); }
+  .drop__title { font-size: var(--m5-font-body-l); font-weight: 600; color: var(--m5-ink); }
+  .drop__hint { font-size: var(--m5-font-caption); color: var(--m5-ink-hint); }
+
+  .sample-row { display: flex; gap: var(--m5-space-s); flex-wrap: wrap; margin-top: var(--m5-space-l); }
+
+  .result {
+    margin-top: var(--m5-space-l);
+    padding: var(--m5-space-l) var(--m5-space-xl);
+    background: var(--m5-surface-subtle);
+    border: 1px solid var(--m5-line-soft);
+    border-radius: var(--m5-radius-xl);
+    min-height: 88px;
+    white-space: pre-wrap;
+    line-height: 1.75;
+    font-size: var(--m5-font-body-l);
+    color: var(--m5-ink);
+  }
+  .result.is-empty { color: var(--m5-ink-hint); font-size: var(--m5-font-body); }
+  .meta {
+    margin-top: var(--m5-space-s);
+    font-family: var(--m5-font-mono);
+    font-size: var(--m5-font-caption);
+    color: var(--m5-ink-hint);
+  }
+  .meta.is-error { color: var(--m5-danger); font-family: var(--m5-font); }
+
+  .rec-row { display: flex; align-items: center; gap: var(--m5-space-m); flex-wrap: wrap; }
+  .rec-state { font-size: var(--m5-font-caption); color: var(--m5-ink-hint); }
+  .rec-dot {
+    display: inline-block; width: 8px; height: 8px; margin-right: 6px;
+    border-radius: 50%; background: var(--m5-danger); animation: m5-pulse 1.1s ease infinite;
+  }
+  @keyframes m5-pulse { 50% { opacity: .25; } }
+
+  .foot-note { margin-top: var(--m5-space-l); font-size: var(--m5-font-caption); color: var(--m5-ink-hint); }
+
+  @media (max-width: 640px) {
+    /* 小屏：隐藏副标题，状态栏只留一行 */
+    .m5-logo .m5-caption { display: none; }
+    #stat {
+      max-width: 46vw;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: right;
+    }
+    .page { padding-block: var(--m5-space-xl) var(--m5-space-2xl); }
+    .panel { padding: var(--m5-space-l); }
+    .drop { padding: var(--m5-space-2xl) var(--m5-space-l); }
+    .tabs .m5-btn { min-width: 0; flex: 1; }
+  }
+</style>
+</head>
+<body>
+
+<header class="m5-header">
+  <div class="m5-header__inner">
+    <a class="m5-logo" href="/">
+      <span class="m5-logo__mark">X</span>
+      <span>X-ASR<span class="m5-caption" style="margin-left:.5em">AX650 NPU</span></span>
+    </a>
+    <div class="m5-caption" id="stat">连接中…</div>
+  </div>
+</header>
+
+<main class="m5-container page main">
+  <div class="page-head">
+    <h1 class="m5-section-title page-head__title">语音识别</h1>
+    <p class="m5-section__desc page-head__desc">
+      X-ASR 中英混说模型，encoder 跑在 AX650 的 NPU 上（INT8，10 秒窗口）。
+      上传一段音频，或者直接对着麦克风说话。
+    </p>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="kpi__label">encoder（NPU）</div><div class="kpi__value">80<em>ms / 10 s</em></div></div>
+    <div class="kpi"><div class="kpi__label">端到端（10 s 音频）</div><div class="kpi__value">0.63<em>s · RTF 0.06</em></div></div>
+    <div class="kpi"><div class="kpi__label">模型体积</div><div class="kpi__value">172<em>MB · INT8</em></div></div>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="m5-btn m5-btn--outline is-active" data-tab="file" role="tab"
+            aria-selected="true" aria-controls="pane-file">上传音频</button>
+    <button class="m5-btn m5-btn--outline" data-tab="mic" role="tab"
+            aria-selected="false" aria-controls="pane-mic">麦克风</button>
+  </div>
+
+  <!-- 上传 -->
+  <section class="pane is-active" id="pane-file" role="tabpanel" aria-label="上传音频">
+    <div class="panel">
+      <div class="drop" id="drop">
+        <div class="drop__title">点击或拖拽音频文件</div>
+        <div class="drop__hint">wav · mp3 · m4a · webm · ogg，10 秒以内一次推理</div>
+      </div>
+      <input type="file" id="file" accept="audio/*" hidden>
+      <div class="sample-row" id="samples"></div>
+      <div class="result is-empty" id="file-out">还没有识别结果。</div>
+      <div class="meta" id="file-meta"></div>
+    </div>
+  </section>
+
+  <!-- 麦克风 -->
+  <section class="pane" id="pane-mic" role="tabpanel" aria-label="麦克风">
+    <div class="panel">
+      <div class="rec-row">
+        <button class="m5-btn m5-btn--primary" id="rec">开始录音</button>
+        <button class="m5-btn m5-btn--outline" id="stop" disabled>停止</button>
+        <span class="rec-state" id="rec-state">麦克风未开启</span>
+      </div>
+      <div class="foot-note">边录边出字：每 1.2 秒发送一次最近 10 秒的音频，显示的是最新结果。</div>
+      <div class="result is-empty" id="mic-out">还没有识别结果。</div>
+      <div class="meta" id="mic-meta"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="m5-footer">
+  <div class="m5-container">
+    <div class="m5-footer__cols">
+      <div>
+        <div class="m5-footer__title">X-ASR · AX650</div>
+        <div class="m5-caption" style="color:var(--m5-ink-on-dark)">
+          Zipformer2 transducer · 中英混说 · INT8
+        </div>
+      </div>
+      <div>
+        <div class="m5-footer__title">模型</div>
+        <div class="m5-caption" style="color:var(--m5-ink-on-dark)">
+          encoder.axmodel（AX650 NPU）+ decoder / joiner（CPU）
+        </div>
+      </div>
+    </div>
+    <div class="m5-footer__bottom">
+      内部测试服务 · 不是 m5stack.com 官方站点 · 权重 Apache-2.0，来源 GilgameshWind/X-ASR-zh-en
+    </div>
+  </div>
+</footer>
+
+<script>
+const $ = s => document.querySelector(s);
+
+/* ---------- tab 切换 ---------- */
+document.querySelectorAll('.tabs .m5-btn').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tabs .m5-btn').forEach(x => {
+    x.classList.remove('is-active');
+    x.setAttribute('aria-selected', 'false');
+  });
+  t.setAttribute('aria-selected', 'true');
+  document.querySelectorAll('.pane').forEach(x => x.classList.remove('is-active'));
+  t.classList.add('is-active');
+  $('#pane-' + t.dataset.tab).classList.add('is-active');
+}));
+
+/* ---------- 结果渲染 ---------- */
+function setResult(box, meta, text, info, isError) {
+  box.textContent = text;
+  box.classList.toggle('is-empty', !text);
+  meta.textContent = info || '';
+  meta.classList.toggle('is-error', !!isError);
+}
+
+function fmt(j) {
+  return `encoder ${j.encoder_ms.toFixed(0)} ms · 解码 ${j.decoder_joiner_ms.toFixed(0)} ms · ` +
+         `总计 ${j.total_ms.toFixed(0)} ms · RTF ${j.rtf} · 音频 ${(j.audio_ms / 1000).toFixed(2)} s`;
+}
+
+/* ---------- 上传 ---------- */
+const drop = $('#drop'), fileInput = $('#file');
+drop.addEventListener('click', () => fileInput.click());
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('is-hover'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('is-hover'));
+drop.addEventListener('drop', e => {
+  e.preventDefault(); drop.classList.remove('is-hover');
+  if (e.dataTransfer.files.length) upload(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files.length) upload(fileInput.files[0]); });
+
+async function upload(f) {
+  const out = $('#file-out'), meta = $('#file-meta');
+  setResult(out, meta, '识别中…', f.name, false);
+  const fd = new FormData();
+  fd.append('audio', f);
+  try {
+    const j = await (await fetch('/api/asr', { method: 'POST', body: fd })).json();
+    if (j.error) { setResult(out, meta, '识别失败', j.error, true); return; }
+    setResult(out, meta, j.text || '（没有识别到内容）', `${f.name} · ${fmt(j)}`, false);
+    refreshStat();
+  } catch (e) {
+    setResult(out, meta, '请求失败', String(e), true);
+  }
+}
+
+/* ---------- 示例音频 ---------- */
+async function loadSamples() {
+  try {
+    const list = await (await fetch('/api/samples')).json();
+    const box = $('#samples');
+    for (const name of list) {
+      const b = document.createElement('button');
+      b.className = 'm5-btn m5-btn--ghost m5-btn--sm';
+      b.textContent = name;
+      b.addEventListener('click', () => runSample(name));
+      box.appendChild(b);
+    }
+  } catch (e) { /* 忽略：示例加载失败不影响主功能 */ }
+}
+
+async function runSample(name) {
+  const out = $('#file-out'), meta = $('#file-meta');
+  setResult(out, meta, '识别中…', name, false);
+  try {
+    const j = await (await fetch('/api/asr_sample', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })).json();
+    if (j.error) { setResult(out, meta, '识别失败', j.error, true); return; }
+    setResult(out, meta, j.text || '（没有识别到内容）', `示例 ${name} · ${fmt(j)}`, false);
+    refreshStat();
+  } catch (e) {
+    setResult(out, meta, '请求失败', String(e), true);
+  }
+}
+loadSamples();
+
+/* ---------- 麦克风 ---------- */
+let ctx, stream, processor, source, chunks = [], recording = false, timer = null, lastRate = 16000;
+
+function markState(text, on) {
+  $('#rec-state').innerHTML = on ? '<span class="rec-dot"></span>' + text : text;
+}
+
+$('#rec').addEventListener('click', startRec);
+$('#stop').addEventListener('click', stopRec);
+
+async function startRec() {
+  const out = $('#mic-out'), meta = $('#mic-meta');
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+    });
+  } catch (e) {
+    markState('拿不到麦克风：' + e.message + '（http 下浏览器会禁用麦克风，请用 https 打开）', false);
+    return;
+  }
+  ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  lastRate = ctx.sampleRate;
+  source = ctx.createMediaStreamSource(stream);
+  processor = ctx.createScriptProcessor(4096, 1, 1);
+  chunks = [];
+  processor.onaudioprocess = e => {
+    if (!recording) return;
+    chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  };
+  source.connect(processor);
+  processor.connect(ctx.destination);
+
+  recording = true;
+  setResult(out, meta, '', '', false);
+  $('#rec').disabled = true;
+  $('#stop').disabled = false;
+  markState('录音中', true);
+  timer = setInterval(sendChunk, 1200);
+  await ctx.resume();
+}
+
+function concatChunks(maxSec = 10) {
+  const total = chunks.reduce((a, c) => a + c.length, 0);
+  const take = Math.min(total, Math.round(maxSec * 16000));
+  const out = new Float32Array(take);
+  let off = total - take, w = 0;
+  for (const c of chunks) {
+    if (off >= c.length) { off -= c.length; continue; }
+    const piece = c.subarray(off);
+    off = 0;
+    out.set(piece.subarray(0, take - w), w);
+    w += piece.length;
+    if (w >= take) break;
+  }
+  return out;
+}
+
+function toPCM16(f32) {
+  const out = new Int16Array(f32.length);
+  for (let i = 0; i < f32.length; i++) {
+    const s = Math.max(-1, Math.min(1, f32[i]));
+    out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  return out;
+}
+
+async function sendPCM(tag) {
+  const out = $('#mic-out'), meta = $('#mic-meta');
+  if (chunks.length === 0) { setResult(out, meta, '没有录到声音。', '', false); return; }
+  const pcm = toPCM16(concatChunks(10));
+  const t0 = performance.now();
+  setResult(out, meta, tag === 'final' ? '识别中…' : (out.textContent || '识别中…'), '', false);
+  try {
+    const j = await (await fetch('/api/asr_pcm?rate=' + (lastRate || 16000), {
+      method: 'POST', headers: { 'Content-Type': 'application/octet-stream' },
+      body: pcm.buffer,
+    })).json();
+    if (j.error) { setResult(out, meta, '识别失败', j.error, true); return; }
+    setResult(out, meta, j.text || '（没有识别到内容）',
+      `${fmt(j)} · 往返 ${(performance.now() - t0).toFixed(0)} ms`, false);
+    refreshStat();
+  } catch (e) {
+    setResult(out, meta, '请求失败', String(e), true);
+  }
+}
+
+const sendChunk = () => { if (recording) sendPCM('live'); };
+
+function stopRec() {
+  recording = false;
+  clearInterval(timer);
+  if (processor) { source.disconnect(); processor.disconnect(); }
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  if (ctx) ctx.close();
+  $('#rec').disabled = false;
+  $('#stop').disabled = true;
+  markState('已停止', false);
+  sendPCM('final');
+}
+
+/* ---------- 状态栏 ---------- */
+async function refreshStat() {
+  try {
+    const j = await (await fetch('/api/health')).json();
+    $('#stat').textContent =
+      `请求 ${j.requests} · 累计音频 ${(j.audio_ms / 1000).toFixed(1)} s · ` +
+      `平均 ${j.requests ? (j.infer_ms / j.requests).toFixed(0) : 0} ms`;
+  } catch (e) { /* 忽略 */ }
+}
+refreshStat();
+setInterval(refreshStat, 15000);
+</script>
+</body>
+</html>

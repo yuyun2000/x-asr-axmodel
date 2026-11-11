@@ -1,0 +1,548 @@
+/*!
+ * M5Stack Web Components v1.0.0
+ * 依赖 tokens.css。命名前缀 m5-，BEM 风格。
+ * 官网原生组件（按钮/导航/卡片/表单）按源码还原；后台类组件（表格/标签/空态/提示）
+ * 为「同风格扩展」，供内部工具页使用，扩展依据见 references/04-components.md。
+ */
+
+/* ========== 按钮 ========== */
+.m5-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+  min-height: 2.4em;
+  padding: 0.45em 1.5em;
+  font-family: inherit;
+  font-size: var(--m5-font-btn);
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  border-radius: var(--m5-radius-pill);
+  cursor: pointer;
+  transition: background-color var(--m5-dur) var(--m5-ease),
+              color var(--m5-dur) var(--m5-ease),
+              border-color var(--m5-dur) var(--m5-ease);
+}
+
+.m5-btn--primary {
+  color: #fff;
+  background: var(--m5-blue);
+}
+
+.m5-btn--primary:hover { background: var(--m5-blue-hover); }
+.m5-btn--primary:active { background: var(--m5-blue-active); }
+
+.m5-btn--outline {
+  color: var(--m5-blue);
+  background: transparent;
+  border-color: var(--m5-blue);
+}
+
+.m5-btn--outline:hover {
+  color: var(--m5-blue-hover);
+  border-color: var(--m5-blue-hover);
+}
+
+.m5-btn--ghost {
+  color: var(--m5-ink);
+  background: var(--m5-surface-subtle);
+}
+
+.m5-btn--ghost:hover {
+  color: var(--m5-blue);
+  background: #eef4f9;
+}
+
+.m5-btn--text {
+  min-height: auto;
+  padding: 0;
+  color: var(--m5-blue);
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.m5-btn--text:hover { color: var(--m5-blue-hover); text-decoration: underline; }
+
+.m5-btn--danger {
+  color: #fff;
+  background: var(--m5-danger);
+}
+
+.m5-btn--sm {
+  min-height: 2em;
+  padding: 0.3em 0.9em;
+  font-size: var(--m5-font-caption);
+}
+
+.m5-btn--lg {
+  min-height: 2.6em;
+  padding: 0.6em 1.9em;
+  font-size: var(--m5-font-body-l);
+}
+
+.m5-btn[disabled],
+.m5-btn.is-disabled {
+  color: #fff;
+  background: var(--m5-line-strong);
+  border-color: transparent;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.m5-btn.is-loading {
+  pointer-events: none;
+  opacity: 0.72;
+}
+
+.m5-btn.is-loading::before {
+  content: "";
+  width: 0.9em;
+  height: 0.9em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: m5-spin 0.8s linear infinite;
+}
+
+@keyframes m5-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 官网订阅按钮：直角小圆角，非胶囊 */
+.m5-btn--subscribe {
+  border-radius: var(--m5-radius-sm);
+  color: #fff;
+  background: #0077c8;
+}
+
+/* ========== 顶部导航 ========== */
+.m5-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--m5-space-l);
+  height: var(--m5-header-h);
+  margin-left: auto;
+}
+
+.m5-nav__item {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 0 3px;
+  font-size: var(--m5-font-nav);
+  font-weight: 700;
+  color: var(--m5-ink);
+  border-bottom: 3px solid transparent;
+  transition: color var(--m5-dur) var(--m5-ease),
+              border-color var(--m5-dur) var(--m5-ease);
+}
+
+.m5-nav__item:hover,
+.m5-nav__item.is-active {
+  color: var(--m5-blue);
+  border-bottom-color: var(--m5-blue);
+}
+
+/* 窄屏导航：折叠为菜单按钮 + 下拉面板（配合 8 行 JS，见 examples/landing） */
+.m5-header__menu {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  color: var(--m5-ink);
+  background: transparent;
+  border: 1px solid var(--m5-line);
+  border-radius: var(--m5-radius-sm);
+  cursor: pointer;
+}
+
+.m5-header__menu::before {
+  content: "";
+  width: 16px;
+  height: 10px;
+  border-top: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+}
+
+@media (max-width: 860px) {
+  .m5-nav {
+    display: none;
+    position: absolute;
+    top: var(--m5-header-h);
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    height: auto;
+    padding: var(--m5-space-s) var(--m5-gutter) var(--m5-space-m);
+    background: var(--m5-surface);
+    border-bottom: 1px solid var(--m5-line);
+    box-shadow: var(--m5-shadow-lg);
+  }
+
+  .m5-nav.is-open { display: flex; }
+
+  .m5-nav__item {
+    height: auto;
+    padding: var(--m5-space-m) 0;
+    border-bottom: 1px solid var(--m5-line-soft);
+    border-left: 3px solid transparent;
+  }
+
+  .m5-nav__item.is-active,
+  .m5-nav__item:hover {
+    padding-left: var(--m5-space-s);
+    border-bottom-color: var(--m5-line-soft);
+    border-left-color: var(--m5-blue);
+  }
+
+  .m5-header__menu { display: inline-flex; }
+
+  .m5-header__inner { gap: var(--m5-space-s); }
+}
+
+.m5-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--m5-surface);
+  border-bottom: 1px solid var(--m5-line);
+}
+
+.m5-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--m5-space-xl);
+  height: var(--m5-header-h);
+  max-width: var(--m5-container-header);
+  margin: 0 auto;
+  padding: 0 var(--m5-gutter);
+}
+
+.m5-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--m5-ink);
+  letter-spacing: 0.01em;
+}
+
+.m5-logo:hover { color: var(--m5-ink); }
+
+/* 占位标识：真实项目必须替换为官方 logo 文件，见 references/11-brand-and-legal.md */
+.m5-logo__mark {
+  display: grid;
+  place-items: center;
+  width: 1.75em;
+  height: 1.75em;
+  font-size: 0.8rem;
+  color: #fff;
+  background: var(--m5-blue);
+  border-radius: var(--m5-radius-xs);
+}
+
+/* ========== 区块与卡片 ========== */
+.m5-section {
+  padding-block: var(--m5-space-3xl);
+}
+
+.m5-section--subtle {
+  background: var(--m5-surface-subtle);
+}
+
+.m5-section__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--m5-space-s);
+  margin-bottom: var(--m5-space-2xl);
+}
+
+.m5-section__desc {
+  max-width: 62ch;
+  font-size: var(--m5-font-body-l);
+  color: var(--m5-ink-2);
+}
+
+.m5-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--m5-surface);
+  border: 1px solid var(--m5-line);
+  border-radius: var(--m5-radius-2xl);
+  transition: border-color var(--m5-dur) var(--m5-ease),
+              box-shadow var(--m5-dur) var(--m5-ease);
+}
+
+.m5-card:hover {
+  border-color: var(--m5-blue);
+  box-shadow: var(--m5-shadow-lg);
+}
+
+.m5-card__media {
+  aspect-ratio: 16 / 10;
+  background: var(--m5-surface-subtle);
+}
+
+.m5-card__media img { width: 100%; height: 100%; object-fit: cover; }
+
+.m5-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--m5-space-s);
+  padding: var(--m5-space-xl);
+}
+
+.m5-card__title { font-size: var(--m5-font-h3); font-weight: 700; }
+
+.m5-card__desc { font-size: var(--m5-font-body); color: var(--m5-ink-muted); }
+
+.m5-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding: var(--m5-space-m) var(--m5-space-xl) var(--m5-space-xl);
+}
+
+.m5-grid {
+  display: grid;
+  gap: var(--m5-space-xl);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+/* ========== 表单 ========== */
+.m5-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--m5-space-xs);
+  margin-bottom: var(--m5-space-l);
+}
+
+.m5-label {
+  font-size: var(--m5-font-caption);
+  font-weight: 500;
+  color: var(--m5-ink-2);
+}
+
+.m5-input,
+.m5-select,
+.m5-textarea {
+  width: 100%;
+  padding: 0.6em 0.75em;
+  font-family: inherit;
+  font-size: var(--m5-font-body);
+  color: var(--m5-ink);
+  background: var(--m5-line-soft);
+  border: 1px solid transparent;
+  border-radius: var(--m5-radius-xs);
+  outline: none;
+  transition: border-color var(--m5-dur) var(--m5-ease),
+              background-color var(--m5-dur) var(--m5-ease);
+}
+
+.m5-input::placeholder,
+.m5-textarea::placeholder { color: var(--m5-ink-hint); }
+
+.m5-input:hover,
+.m5-select:hover { background: #e9e9e9; }
+
+.m5-input:focus,
+.m5-select:focus,
+.m5-textarea:focus {
+  background: var(--m5-surface);
+  border-color: var(--m5-blue);
+}
+
+.m5-input[aria-invalid="true"] { border-color: var(--m5-danger); }
+
+.m5-help { font-size: var(--m5-font-caption); color: var(--m5-ink-hint); }
+.m5-help--error { color: var(--m5-danger); }
+
+.m5-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  cursor: pointer;
+  font-size: var(--m5-font-body);
+}
+
+.m5-check input {
+  width: 1.15em;
+  height: 1.15em;
+  margin: 0;
+  accent-color: var(--m5-blue);
+}
+
+/* 官网自定义复选框：20px 方角 + 蓝底勾选 */
+.m5-check--boxed input {
+  appearance: none;
+  border: 2px solid var(--m5-ink-2);
+  border-radius: var(--m5-radius-sm);
+  background: transparent;
+}
+
+.m5-check--boxed input:checked {
+  background: var(--m5-blue);
+  border-color: var(--m5-blue);
+}
+
+/* ========== 标签 / 徽标 ========== */
+.m5-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.15em 0.6em;
+  font-size: var(--m5-font-caption);
+  font-weight: 500;
+  color: var(--m5-blue);
+  background: rgba(2, 130, 203, 0.1);
+  border-radius: var(--m5-radius-xs);
+  white-space: nowrap;
+}
+
+.m5-tag--neutral { color: var(--m5-ink-2); background: var(--m5-line-soft); }
+.m5-tag--danger { color: var(--m5-danger); background: rgba(255, 77, 79, 0.12); }
+
+.m5-dot {
+  width: 0.45em;
+  height: 0.45em;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ========== 表格 ========== */
+.m5-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.m5-table-wrap .m5-table { min-width: 640px; }
+
+.m5-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--m5-font-body);
+}
+
+.m5-table th {
+  padding: var(--m5-space-m) var(--m5-space-l);
+  font-size: var(--m5-font-caption);
+  font-weight: 500;
+  color: var(--m5-ink-muted);
+  text-align: left;
+  white-space: nowrap;
+  background: var(--m5-surface-subtle);
+  border-bottom: 1px solid var(--m5-line);
+}
+
+.m5-table td {
+  padding: var(--m5-space-l);
+  border-bottom: 1px solid var(--m5-line-soft);
+}
+
+.m5-table tbody tr:hover { background: rgba(2, 130, 203, 0.04); }
+
+.m5-table .is-num { font-variant-numeric: tabular-nums; text-align: right; }
+
+/* ========== 空态 / 提示 ========== */
+.m5-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--m5-space-s);
+  padding: var(--m5-space-3xl) var(--m5-space-l);
+  text-align: center;
+  color: var(--m5-ink-muted);
+}
+
+.m5-empty__icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  font-size: 22px;
+  color: var(--m5-blue);
+  background: rgba(2, 130, 203, 0.1);
+  border-radius: 50%;
+}
+
+.m5-alert {
+  display: flex;
+  gap: var(--m5-space-m);
+  padding: var(--m5-space-m) var(--m5-space-l);
+  font-size: var(--m5-font-body);
+  color: var(--m5-ink-2);
+  background: var(--m5-surface-subtle);
+  border-left: 3px solid var(--m5-blue);
+  border-radius: var(--m5-radius-sm);
+}
+
+.m5-alert--danger { background: rgba(255, 77, 79, 0.08); border-left-color: var(--m5-danger); }
+
+/* ========== 指标卡 ========== */
+.m5-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: var(--m5-space-xs);
+  padding: var(--m5-space-xl);
+  background: var(--m5-surface);
+  border: 1px solid var(--m5-line);
+  border-radius: var(--m5-radius-lg);
+}
+
+.m5-kpi__label { font-size: var(--m5-font-caption); color: var(--m5-ink-muted); }
+
+.m5-kpi__value {
+  font-size: var(--m5-font-h2);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--m5-ink);
+}
+
+.m5-kpi__delta { font-size: var(--m5-font-caption); color: var(--m5-blue); }
+
+/* ========== 页脚 ========== */
+.m5-footer {
+  padding-block: var(--m5-space-3xl) var(--m5-space-xl);
+  color: #fff;
+  background: var(--m5-black);
+}
+
+.m5-footer__cols {
+  display: grid;
+  gap: var(--m5-space-xl);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin-bottom: var(--m5-space-2xl);
+}
+
+.m5-footer__title {
+  margin-bottom: var(--m5-space-m);
+  font-size: var(--m5-font-body);
+  font-weight: 500;
+  color: #fff;
+}
+
+.m5-footer a { color: var(--m5-ink-on-dark); font-size: var(--m5-font-caption); }
+.m5-footer a:hover { color: #fff; }
+
+.m5-footer__bottom {
+  padding-top: var(--m5-space-l);
+  font-size: var(--m5-font-caption);
+  color: var(--m5-ink-on-dark);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+@media (max-width: 767px) {
+  .m5-grid { grid-template-columns: 1fr; }
+  .m5-section { padding-block: var(--m5-space-2xl); }
+}

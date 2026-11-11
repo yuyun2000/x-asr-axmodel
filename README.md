@@ -26,7 +26,7 @@ SmoothQuant 编译被 SIGTERM，最终交付纯 INT8（质量与 sherpa-onnx 官
 页面按 M5Stack 官网设计语言实现（蓝色标题、1px 细描边卡片、胶囊按钮、黑色页脚），
 支持文件上传 / 示例音频 / 麦克风实时识别，桌面与手机都能用。
 
-| 上传 + 示例试听 + 识别结果 | 麦克风 |
+| 上传 + 示例试听 + 识别结果（头部显示 `ort+npu` 后端） | 麦克风 |
 |---|---|
 | ![上传](docs/images/web-upload.png) | ![麦克风](docs/images/web-mic.png) |
 

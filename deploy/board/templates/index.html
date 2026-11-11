@@ -476,7 +476,7 @@ async function refreshStat() {
   try {
     const j = await (await fetch('/api/health')).json();
     $('#stat').textContent =
-      `请求 ${j.requests} · 累计音频 ${(j.audio_ms / 1000).toFixed(1)} s · ` +
+      `${j.aux_backend} · 请求 ${j.requests} · 累计音频 ${(j.audio_ms / 1000).toFixed(1)} s · ` +
       `平均 ${j.requests ? (j.infer_ms / j.requests).toFixed(0) : 0} ms`;
   } catch (e) { /* 忽略 */ }
 }

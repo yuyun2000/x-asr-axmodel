@@ -89,8 +89,9 @@ def setup_page():
 def health():
     return jsonify({
         "ok": True,
-        "device": "AX650 NPU",
+        "device": "AX8850 NPU",
         "model": ASR.io,
+        "aux_backend": ASR.aux_backend,
         "uptime_s": round(time.time() - START_TIME, 1),
         **STATS,
     })

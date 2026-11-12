@@ -33,6 +33,8 @@ SmoothQuant 编译被 SIGTERM，最终交付纯 INT8（质量与 sherpa-onnx 官
 http 访问时页面会提示麦克风需要 HTTPS：![提示](docs/images/web-http-notice.png)
 装一次本地 CA 就能彻底去掉证书警告：![setup](docs/images/web-setup.png)
 
+流式模式（960 ms chunk，边说边出字）：![流式](docs/images/web-stream.png)
+
 实测（10.05 s 音频）：encoder **80 ms**（NPU）+ joiner **70 ms**（NPU，U16）+ decoder 38 ms（CPU）+ fbank 145 ms
 = **360 ms，RTF 0.036**（decoder/joiner 取舍见 `reports/07-aux-on-npu.md`）；
 4 条测试音频里 **2 条与 fp32 ONNX 完全一致**，另 2 条只有英文词/近音差异。

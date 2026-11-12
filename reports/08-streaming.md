@@ -78,3 +78,16 @@ GET  /api/stream/health                     -> {loaded, sessions}
 
 `yunyu1258/x-asr-axmodel` 的 `streaming/` 目录：`encoder_stream960.axmodel`（157 MB）、
 `decoder.onnx`、`joiner.onnx`（必须与流式 encoder 同源）。
+
+
+## CI 实测（GitHub Actions，两个 job 一起跑）
+
+运行：<https://github.com/yuyun2000/x-asr-axmodel/actions/runs/43148285622>
+
+| Job | 编译耗时 | 峰值内存 | 仿真结果 | artifact |
+|---|---|---|---|---|
+| `export-axmodel`（离线） | 36 min 03 s | 9.41 GB | cosine **0.999098** | 172 MB |
+| `export-streaming-axmodel`（流式） | **11 min 53 s** | 6.26 GB | 116/116 输出，mean 0.981222 / min 0.933873，**encoder_out 0.999477** | 164 MB |
+
+CI 里流式校准集：83 个 chunk → 取 16 组，生成 116 个 tar。流式图的编译比离线快 3 倍
+（单子图、参数量相同但没有 10 s 窗口的大激活）。

@@ -70,7 +70,7 @@ python deploy/python/run_asr.py --models-dir models --audio models/test_wavs/0.w
 | 5. 精度验收（cosine ≥ 0.99） | ✅ | **cosine 0.999012**，端到端文本与 ONNX 逐 token 一致，见 `reports/03-simulate.md` |
 | 6. 板端推理 + 部署文档 | ✅ | AX8850 实机跑通：`deploy/board/`（ctypes 引擎 + Flask 网页服务），RTF 0.036 |
 | 6.5 decoder / joiner 上 NPU | ✅ | joiner U16 上 NPU（0.28 ms/帧，域内文本与 fp32 一致）；decoder 可上 NPU（`aux_backend="npu"`） |
-| 6.6 流式模型（960 ms） | ✅ | 157 MB 流式 encoder 上 NPU；板端每块往返 ~80 ms、RTF 0.072，文本与离线一致，见 `reports/08-streaming.md` |
+| 6.6 流式模型（960 ms） | ✅ | 157 MB 流式 encoder 上 NPU；板端每块往返 ~80 ms、RTF 0.072，文本与离线一致，见 `reports/08-streaming.md`；转换流水线已并入 PR #4185，模型备份在 HF `streaming/` |
 | 7. HF 模型发布 | ✅ | <https://huggingface.co/yunyu1258/x-asr-axmodel> |
 | 8. 上游 sherpa-onnx PR | ✅ | <https://github.com/k2-fsa/sherpa-onnx/pull/4185> |
 

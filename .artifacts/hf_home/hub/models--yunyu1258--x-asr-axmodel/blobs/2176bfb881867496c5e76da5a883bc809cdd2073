@@ -1,0 +1,59 @@
+---
+license: apache-2.0
+language:
+- zh
+- en
+library_name: axengine
+tags:
+- automatic-speech-recognition
+- axera
+- ax650
+- axmodel
+- zipformer
+- sherpa-onnx
+- transducer
+---
+
+# X-ASR → AX650 (AXMODEL)
+
+[X-ASR-zh-en](https://huggingface.co/GilgameshWind/X-ASR-zh-en)（0.16B Zipformer2 transducer，
+中英双语，Apache-2.0）的**离线 encoder** 转换到 AXERA AX650 NPU 的结果。
+
+## 文件
+
+| 文件 | 说明 |
+|---|---|
+| `encoder.axmodel` | NPU 模型，输入 `x4d [1,1,1000,80]`（10 s fbank），输出 `encoder_out [1,248,512]` |
+| `encoder.onnx` | 对应的 fp32 ONNX（无板子时可用来跑同一套推理逻辑） |
+| `decoder.onnx` / `joiner.onnx` | CPU 侧贪心搜索用（onnxruntime） |
+| `tokens.txt` | 5000 token，无标点版 |
+| `test_wavs/` | 16 kHz 单声道测试音频 |
+
+## 推理
+
+```bash
+pip install axengine numpy
+python run_asr.py --models-dir models --audio models/test_wavs/0.wav
+```
+
+## 精度（Pulsar2 仿真，ONNX vs AXMODEL）
+
+| wav | cosine | 文本一致性 |
+|---|---|---|
+| 0.wav | 0.999012 | 完全一致 |
+| 1.wav | 0.998276 | 差异 10 token（英文词） |
+| 2.wav | 0.996739 | 差异 3 token |
+| 3.wav | 0.998375 | 差异 3 token |
+
+mean cosine **0.998101**，min **0.996739**；MAE 0.08–0.14。
+
+## 限制
+
+- 固定 10 s 窗口（1000 帧）；更长音频按 8 s 步长切窗；
+- 无标点输出（`tokens.txt` 为无标点版本）；
+- 需要 AX650 / AX630C 系列 NPU 与 AXERA `axengine` 运行时；
+- 转换脚本与更多说明：<https://github.com/yuyun2000/x-asr-axmodel>
+
+## 许可
+
+权重来自 X-ASR（Apache-2.0）；转换脚本与推理代码见上述仓库。

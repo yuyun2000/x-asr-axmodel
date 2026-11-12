@@ -59,3 +59,22 @@ GET  /api/stream/health                     -> {loaded, sessions}
 
 - CLI 脚本正常退出时偶发 `munmap_chunk(): invalid pointer`（AX 运行时退出清理与 ctypes 缓冲冲突）；常驻服务不受影响，CLI 里用 `os._exit(0)` 规避
 - 冻结 `processed_lens=256` 会让左上下文 mask 永远视为「全部有效」，长音频第 2 块起与真实动态略有差异；如需完全一致，可把 mask 张量提升为图输入（CPU 侧计算后喂入）
+
+
+## 上游 PR
+
+流式流水线已经补进 <https://github.com/k2-fsa/sherpa-onnx/pull/4185>（commit `a318668`），
+`scripts/zipformer-transducer/x-asr/axera/` 下新增：
+
+| 文件 | 作用 |
+|---|---|
+| `export-streaming-onnx.sh` | 用 icefall `export-onnx-streaming.py --dynamic-batch 0` 导出静态 batch 的流式 ONNX |
+| `prepare-streaming-encoder.py` | 固定 batch、冻结 1658 个形状张量、常量折叠 344 个 mask 节点、99 个 Log→Softplus、去常量输出 |
+| `make-streaming-calibration-set.py` | 跑 fp32 流式，按 chunk 记录真实 `(x, cache)` 做校准 |
+| `make-streaming-config.py` | 生成 116 项输入的 Pulsar2 配置 |
+| `verify-streaming-encoder.py` | 116 个输出逐一对 fp32 ONNX 求 cosine |
+
+## HF 备份
+
+`yunyu1258/x-asr-axmodel` 的 `streaming/` 目录：`encoder_stream960.axmodel`（157 MB）、
+`decoder.onnx`、`joiner.onnx`（必须与流式 encoder 同源）。

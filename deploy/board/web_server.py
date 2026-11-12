@@ -19,7 +19,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 import ssl
+import subprocess
+import sys
+import uuid
 import subprocess
 import tempfile
 import threading
@@ -33,6 +37,7 @@ from asr_engine import Asr, read_wav
 
 app = Flask(__name__)
 ASR: Asr | None = None
+STREAMING_MODELS = "/root/x-asr/models/streaming"
 SAMPLES_DIR = "/root/x-asr/test_wavs"
 LOCK = threading.Lock()
 STATS = {"requests": 0, "audio_ms": 0.0, "infer_ms": 0.0}
@@ -77,6 +82,79 @@ def _run(pcm: np.ndarray) -> dict:
 @app.get("/")
 def index():
     return render_template("index.html")
+
+
+STREAM_PORT = 8082
+STREAM_PROC = None
+
+
+def _stream_proc() -> bool:
+    """确保独立的流式服务进程在跑（AX 运行时同进程加载第二个模型会崩）。"""
+    global STREAM_PROC
+    import urllib.request
+    def alive():
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{STREAM_PORT}/health", timeout=1) as r:
+                return r.status == 200
+        except Exception:
+            return False
+    if alive():
+        return True
+    if STREAM_PROC is None or STREAM_PROC.poll() is not None:
+        here = Path(__file__).resolve().parent
+        STREAM_PROC = subprocess.Popen(
+            [sys.executable, str(here / "stream_server.py"), "--models-dir", STREAMING_MODELS,
+             "--port", str(STREAM_PORT)],
+            stdout=open("/root/x-asr/stream.log", "ab"), stderr=subprocess.STDOUT,
+            start_new_session=True)
+    for _ in range(120):          # 首次要加载 157 MB 的 encoder
+        if alive():
+            return True
+        time.sleep(0.5)
+    return False
+
+
+def _proxy(path: str, timeout: float = 60.0):
+    import urllib.request, urllib.error
+    url = f"http://127.0.0.1:{STREAM_PORT}{path}"
+    data = request.get_data(cache=False) or None
+    req = urllib.request.Request(url, data=data, method=request.method)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return jsonify(json.loads(r.read().decode())), r.status
+    except urllib.error.HTTPError as e:
+        return jsonify({"error": e.read().decode()[:200]}), e.code
+    except Exception as e:
+        return jsonify({"error": f"stream service unavailable: {e}"}), 503
+
+
+@app.post("/api/stream/start")
+def stream_start():
+    if not _stream_proc():
+        return jsonify({"error": "streaming service did not start"}), 503
+    return _proxy("/start", timeout=180)
+
+
+@app.post("/api/stream/pcm")
+def stream_pcm():
+    qs = request.query_string.decode()
+    return _proxy("/pcm" + (("?" + qs) if qs else ""))
+
+
+@app.post("/api/stream/end")
+def stream_end():
+    qs = request.query_string.decode()
+    return _proxy("/end" + (("?" + qs) if qs else ""))
+
+
+@app.get("/api/stream/health")
+def stream_health():
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{STREAM_PORT}/health", timeout=2) as r:
+            return jsonify(json.loads(r.read().decode()))
+    except Exception:
+        return jsonify({"loaded": False, "sessions": 0})
 
 
 @app.get("/setup")

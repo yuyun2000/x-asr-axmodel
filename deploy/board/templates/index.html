@@ -197,6 +197,8 @@
             aria-selected="true" aria-controls="pane-file">上传音频</button>
     <button class="m5-btn m5-btn--outline" data-tab="mic" role="tab"
             aria-selected="false" aria-controls="pane-mic">麦克风</button>
+    <button class="m5-btn m5-btn--outline" data-tab="live" role="tab"
+            aria-selected="false" aria-controls="pane-live">流式实时</button>
   </div>
 
   <!-- 上传 -->
@@ -228,6 +230,21 @@
       <div class="foot-note">边录边出字：每 1.2 秒发送一次最近 10 秒的音频，显示的是最新结果。</div>
       <div class="result is-empty" id="mic-out">还没有识别结果。</div>
       <div class="meta" id="mic-meta"></div>
+    </div>
+  </section>
+  <!-- 流式 -->
+  <section class="pane" id="pane-live" role="tabpanel" aria-label="流式实时">
+    <div class="panel">
+      <div class="rec-row">
+        <button class="m5-btn m5-btn--primary" id="live-start">开始流式识别</button>
+        <button class="m5-btn m5-btn--outline" id="live-stop" disabled>停止</button>
+        <span class="rec-state" id="live-state">960 ms 一块，边说边出字</span>
+      </div>
+      <div class="foot-note">
+        流式模型每 960 ms 处理一块音频，首字延迟约 1 秒；和上面「上传音频」用的是同一个模型的两个版本。
+      </div>
+      <div class="result is-empty" id="live-out">还没有识别结果。</div>
+      <div class="meta" id="live-meta"></div>
     </div>
   </section>
 </main>
@@ -469,6 +486,93 @@ function stopRec() {
   $('#stop').disabled = true;
   markState('已停止', false);
   sendPCM('final');
+}
+
+/* ---------- 流式实时 ---------- */
+let live = { ctx: null, stream: null, proc: null, src: null, sid: null, timer: null, on: false, buf: [] };
+
+$('#live-start').addEventListener('click', startLive);
+$('#live-stop').addEventListener('click', stopLive);
+
+async function startLive() {
+  const out = $('#live-out'), meta = $('#live-meta');
+  try {
+    live.stream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+    });
+  } catch (e) {
+    $('#live-state').textContent = '拿不到麦克风：' + e.message + '（请用 https 打开）';
+    return;
+  }
+  const r = await fetch('/api/stream/start', { method: 'POST' });
+  const j = await r.json();
+  if (j.error) { setResult(out, meta, '流式模型不可用', j.error, true); return; }
+  live.sid = j.sid;
+  live.ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  live.src = live.ctx.createMediaStreamSource(live.stream);
+  live.proc = live.ctx.createScriptProcessor(4096, 1, 1);
+  live.buf = [];
+  live.proc.onaudioprocess = e => {
+    if (!live.on) return;
+    live.buf.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  };
+  live.src.connect(live.proc);
+  live.proc.connect(live.ctx.destination);
+  live.on = true;
+  live.started = performance.now();
+  setResult(out, meta, '', '', false);
+  $('#live-start').disabled = true; $('#live-stop').disabled = false;
+  $('#live-state').innerHTML = '<span class="rec-dot"></span>流式识别中';
+  live.timer = setInterval(pushLive, 500);
+  await live.ctx.resume();
+}
+
+function takeLive() {
+  const total = live.buf.reduce((a, c) => a + c.length, 0);
+  const f = new Float32Array(total);
+  let off = 0;
+  for (const c of live.buf) { f.set(c, off); off += c.length; }
+  live.buf = [];
+  return f;
+}
+
+async function pushLive() {
+  if (!live.on || !live.sid) return;
+  const f = takeLive();
+  if (f.length === 0) return;
+  const pcm = new Int16Array(f.length);
+  for (let i = 0; i < f.length; i++) {
+    const s = Math.max(-1, Math.min(1, f[i]));
+    pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  try {
+    const j = await (await fetch('/api/stream/pcm?sid=' + live.sid + '&rate=' + live.ctx.sampleRate, {
+      method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: pcm.buffer,
+    })).json();
+    if (j.error) { setResult($('#live-out'), $('#live-meta'), '流式出错', j.error, true); return; }
+    if (j.text) setResult($('#live-out'), $('#live-meta'), j.text, '', false);
+    $('#live-meta').textContent =
+      `已处理 ${(j.audio_ms/1000).toFixed(1)} s · enc ${j.encoder_ms.toFixed(0)} ms · dec ${j.decoder_joiner_ms.toFixed(0)} ms · 往返 ${j.roundtrip_ms.toFixed(0)} ms`;
+  } catch (e) { /* 网络抖动忽略 */ }
+}
+
+async function stopLive() {
+  live.on = false;
+  clearInterval(live.timer);
+  if (live.proc) { live.src.disconnect(); live.proc.disconnect(); }
+  if (live.stream) live.stream.getTracks().forEach(t => t.stop());
+  if (live.ctx) live.ctx.close();
+  $('#live-start').disabled = false; $('#live-stop').disabled = true;
+  $('#live-state').textContent = '已停止';
+  await pushLive();
+  if (live.sid) {
+    try {
+      const j = await (await fetch('/api/stream/end?sid=' + live.sid, { method: 'POST' })).json();
+      if (j.text) setResult($('#live-out'), $('#live-meta'), j.text,
+        `最终 · enc ${j.encoder_ms.toFixed(0)} ms · dec ${j.decoder_joiner_ms.toFixed(0)} ms`, false);
+    } catch (e) { /* ignore */ }
+    live.sid = null;
+  }
 }
 
 /* ---------- 状态栏 ---------- */

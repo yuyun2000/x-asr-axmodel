@@ -15,6 +15,7 @@ Struct layouts follow ``/soc/include/ax_engine_type.h`` for aarch64.
 from __future__ import annotations
 
 import ctypes
+import os
 from ctypes import (POINTER, Structure, byref, c_char_p, c_int32, c_size_t,
                     c_uint8, c_uint32, c_uint64, c_void_p)
 
@@ -124,12 +125,12 @@ class AxEngine:
                 raise RuntimeError("AX_ENGINE_Init failed")
         return cls._sys, cls._eng
 
-    def __init__(self, model_path: str):
+    def __init__(self, model_path: str, release_model_buffer: bool = True):
         sys_lib, eng = self._libs()
         self._sys, self._eng = sys_lib, eng
 
         data = open(model_path, "rb").read()
-        # the SDK expects a 128-byte aligned model buffer
+        # SDK 要求模型 buffer 128 字节对齐
         self._model_buf = ctypes.create_string_buffer(len(data) + 128)
         base = ctypes.addressof(self._model_buf)
         aligned = (base + 127) & ~127
@@ -150,9 +151,15 @@ class AxEngine:
         if ret != 0:
             raise RuntimeError(f"AX_ENGINE_GetIOInfo failed: {ret}")
 
+        # CreateHandle 之后 AX 已经把模型拷进 CMM，Python 侧的大 buffer 可以放掉；
+        # 板子只有 2 GB 系统内存，165 MB 的副本必须省。
+        if release_model_buffer:
+            self._model_buf = None
+
         info = self.io_info.contents
         self.input_meta = [info.pInputs[i] for i in range(info.nInputSize)]
         self.output_meta = [info.pOutputs[i] for i in range(info.nOutputSize)]
+        self.io = self.describe()
 
         # allocate device buffers once
         self._in_bufs, self._out_bufs = [], []
@@ -222,10 +229,7 @@ class AxEngine:
         return outputs
 
     def __del__(self):
-        try:
-            if getattr(self, "handle", None):
-                self._eng.AX_ENGINE_DestroyHandle(self.handle)
-            for phy, vir in getattr(self, "_in_bufs", []) + getattr(self, "_out_bufs", []):
-                self._sys.AX_SYS_MemFree(phy, vir)
-        except Exception:
-            pass
+        # 不在析构里显式 free：单进程生命周期内引擎常驻，AX 运行时随进程退出清理。
+        # 早期版本在 __del__ 里 AX_ENGINE_DestroyHandle + AX_SYS_MemFree，
+        # 实测会在解释器退出时 "munmap_chunk(): invalid pointer" 崩掉。
+        pass
